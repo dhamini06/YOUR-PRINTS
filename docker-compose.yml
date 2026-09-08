@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: yourprints-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-yourprints_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-yourprints_insecure_dev_password}
+      POSTGRES_DB: ${DB_NAME:-yourprints_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-yourprints_user} -d ${DB_NAME:-yourprints_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: yourprints-backend
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-yourprints_user}:${DB_PASSWORD:-yourprints_insecure_dev_password}@postgres:5432/${DB_NAME:-yourprints_db}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: yourprints-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
