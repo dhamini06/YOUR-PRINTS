@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from app.domain.enums import (
     TargetType,
     InvestigationStatus,
@@ -17,10 +17,30 @@ class HealthResponse(BaseModel):
     timestamp: datetime
 
 
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+    details: Optional[Dict[str, Any]] = None
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorDetail
+
+
 class InvestigationCreateRequest(BaseModel):
-    target: EmailStr = Field(description="Target email address to investigate")
-    target_type: TargetType = Field(default=TargetType.EMAIL)
-    turnstile_token: Optional[str] = Field(default=None, description="Cloudflare Turnstile token")
+    target: str = Field(
+        ...,
+        description="Target email address to investigate",
+        examples=["target@example.com"],
+    )
+    target_type: TargetType = Field(
+        default=TargetType.EMAIL,
+        description="Investigation target type",
+    )
+    turnstile_token: Optional[str] = Field(
+        default=None,
+        description="Cloudflare Turnstile token for public bot verification",
+    )
 
 
 class EvidenceSchema(BaseModel):
@@ -70,6 +90,7 @@ class InvestigationResponse(BaseModel):
     summary_stats: Dict[str, Any] = {}
     created_at: datetime
     completed_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
     entities: List[EntitySchema] = []
     relationships: List[RelationshipSchema] = []
 

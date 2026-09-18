@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ArrowRight, Shield, CheckCircle2, Lock, EyeOff, Search } from 'lucide-react';
+import { ArrowRight, Shield, CheckCircle2, EyeOff, Search, Loader2 } from 'lucide-react';
+import { createInvestigation } from '@/lib/api';
+import { Investigation } from '@/lib/types';
 
 interface InvestigationInputProps {
   onInvestigatePreview?: (email: string) => void;
@@ -11,12 +13,12 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [previewTarget, setPreviewTarget] = useState<string | null>(null);
+  const [activeInvestigation, setActiveInvestigation] = useState<Investigation | null>(null);
 
   // RFC 5322 compliant regex for client-side initial validation
   const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
 
@@ -32,10 +34,20 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
 
     setError(null);
     setIsSubmitting(true);
-    setPreviewTarget(cleanEmail);
 
-    if (onInvestigatePreview) {
-      onInvestigatePreview(cleanEmail);
+    try {
+      // Connect to Phase 2 Investigation API endpoint
+      const result = await createInvestigation(cleanEmail);
+      setActiveInvestigation(result);
+
+      if (onInvestigatePreview) {
+        onInvestigatePreview(cleanEmail);
+      }
+    } catch (err: any) {
+      // Fallback display if backend is offline in local preview mode
+      setError(err.message || 'Failed to initialize investigation.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -61,17 +73,28 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
               setEmail(e.target.value);
               if (error) setError(null);
             }}
+            disabled={isSubmitting}
             placeholder="Enter an email address (e.g. target@domain.com)"
-            className="flex-1 px-3 py-4 bg-transparent text-sm md:text-base font-mono text-[#111110] placeholder-[#9E9D97] focus:outline-none"
+            className="flex-1 px-3 py-4 bg-transparent text-sm md:text-base font-mono text-[#111110] placeholder-[#9E9D97] focus:outline-none disabled:opacity-50"
             autoComplete="off"
             spellCheck="false"
           />
           <button
             type="submit"
-            className="px-6 py-4 bg-[#111110] hover:bg-[#2A2A28] text-white font-mono text-xs uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors group shrink-0"
+            disabled={isSubmitting}
+            className="px-6 py-4 bg-[#111110] hover:bg-[#2A2A28] disabled:bg-[#64635E] text-white font-mono text-xs uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors group shrink-0"
           >
-            <span>Investigate</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform text-[#C8FF00]" />
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#C8FF00]" />
+                <span>Initializing...</span>
+              </>
+            ) : (
+              <>
+                <span>Investigate</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform text-[#C8FF00]" />
+              </>
+            )}
           </button>
         </div>
 
@@ -103,35 +126,58 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
         </div>
       </div>
 
-      {/* Phase 1 Preview Modal: Investigation Lifecycle Architecture */}
-      {previewTarget && (
+      {/* Active Investigation Card: Real Backend API Result */}
+      {activeInvestigation && (
         <div className="mt-8 p-6 bg-white border border-[#E5E4DE] shadow-subtle space-y-6 animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-[#E5E4DE] pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#E5E4DE] pb-4 gap-2">
             <div className="space-y-1">
               <div className="text-[10px] font-mono text-[#64635E] uppercase tracking-widest">
-                TARGET IDENTIFIER
+                TARGET IDENTIFIER // {activeInvestigation.id}
               </div>
-              <div className="font-mono text-sm font-semibold text-[#111110]">
-                {previewTarget}
+              <div className="font-mono text-base font-bold text-[#111110]">
+                {activeInvestigation.target_value}
               </div>
             </div>
-            <div className="text-right">
+            <div className="flex items-center gap-2">
               <span className="inline-flex items-center px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider bg-[#C8FF00]/20 text-[#111110] border border-[#C8FF00]">
-                PHASE 1 SPECIFICATION
+                STATUS: {activeInvestigation.status}
+              </span>
+              <span className="inline-flex items-center px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider bg-[#F4F3EF] text-[#64635E] border border-[#E5E4DE]">
+                STAGE: {activeInvestigation.current_stage}
               </span>
             </div>
           </div>
 
           <div className="space-y-3">
-            <div className="text-xs font-mono text-[#64635E] uppercase tracking-wider">
-              Investigation Execution Pipeline (5 Stages)
+            <div className="text-xs font-mono text-[#64635E] uppercase tracking-wider flex items-center justify-between">
+              <span>Investigation Lifecycle Pipeline</span>
+              <span className="text-[10px] text-[#111110]">ROOT ENTITY CREATED</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
               {stages.map((stage) => (
-                <div key={stage.num} className="p-3 bg-[#FBFBFA] border border-[#E5E4DE] flex flex-col justify-between">
-                  <div className="font-mono text-[10px] text-[#C5221F] font-semibold">{stage.num}</div>
-                  <div className="font-mono text-xs font-bold text-[#111110] mt-1">{stage.title}</div>
-                  <div className="font-sans text-[11px] text-[#64635E] mt-2 leading-tight">{stage.desc}</div>
+                <div
+                  key={stage.num}
+                  className={`p-3 border flex flex-col justify-between transition-colors ${
+                    stage.num === '01'
+                      ? 'bg-[#111110] text-white border-[#111110]'
+                      : 'bg-[#FBFBFA] text-[#111110] border-[#E5E4DE]'
+                  }`}
+                >
+                  <div
+                    className={`font-mono text-[10px] font-semibold ${
+                      stage.num === '01' ? 'text-[#C8FF00]' : 'text-[#64635E]'
+                    }`}
+                  >
+                    {stage.num} {stage.num === '01' && '• ACTIVE'}
+                  </div>
+                  <div className="font-mono text-xs font-bold mt-1">{stage.title}</div>
+                  <div
+                    className={`font-sans text-[11px] mt-2 leading-tight ${
+                      stage.num === '01' ? 'text-[#D6D5CD]' : 'text-[#64635E]'
+                    }`}
+                  >
+                    {stage.desc}
+                  </div>
                 </div>
               ))}
             </div>
@@ -139,17 +185,17 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
 
           <div className="p-4 bg-[#F4F3EF] border border-[#E5E4DE] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono">
             <div className="flex items-center space-x-2 text-[#64635E]">
-              <span className="w-2 h-2 rounded-full bg-[#111110]"></span>
-              <span>Backend orchestration & provider collection enabled in Phase 2 & 3.</span>
+              <span className="w-2 h-2 rounded-full bg-[#C8FF00] border border-[#111110]/30"></span>
+              <span>Investigation created & persisted in database. Ready for Phase 3 provider execution.</span>
             </div>
             <button
               onClick={() => {
-                setPreviewTarget(null);
-                setIsSubmitting(false);
+                setActiveInvestigation(null);
+                setEmail('');
               }}
               className="text-[#111110] underline font-semibold hover:text-[#64635E]"
             >
-              Reset Target
+              Start New Investigation
             </button>
           </div>
         </div>
