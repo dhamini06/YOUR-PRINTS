@@ -23,6 +23,7 @@ from app.domain.validation import (
     compute_target_hash,
     TargetValidationError,
 )
+from app.engine.orchestrator import orchestrator
 
 router = APIRouter(prefix="/investigations", tags=["Investigations"])
 
@@ -45,7 +46,8 @@ async def create_investigation(
     Initiate a new digital footprint investigation for an email address.
     
     Normalizes the email address, verifies opt-out status, initializes the
-    investigation record with an ephemeral TTL, and establishes the root entity.
+    investigation record with an ephemeral TTL, and executes the 5-stage
+    investigation pipeline (discovery, correlation, and evidence linking).
     """
     # 1. Syntax & protocol normalization
     try:
@@ -109,19 +111,10 @@ async def create_investigation(
     db.add(root_entity)
     await db.commit()
 
-    # 5. Reload with relationships for full schema response
-    stmt = (
-        select(Investigation)
-        .where(Investigation.id == investigation.id)
-        .options(
-            selectinload(Investigation.entities),
-            selectinload(Investigation.relationships),
-        )
-    )
-    res = await db.execute(stmt)
-    created_inv = res.scalars().one()
+    # 5. Execute 5-Stage Orchestration Pipeline
+    completed_inv = await orchestrator.execute_investigation(investigation.id, db)
 
-    return created_inv
+    return completed_inv
 
 
 @router.get(
