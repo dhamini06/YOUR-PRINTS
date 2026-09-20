@@ -1,4 +1,4 @@
-import { HealthCheckResponse, Investigation } from './types';
+import { HealthCheckResponse, Investigation, Evidence } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -44,6 +44,37 @@ export async function getInvestigation(id: string): Promise<Investigation> {
   const data = await res.json();
   if (!res.ok) {
     const errorMsg = data?.error?.message || `Investigation lookup failed with status: ${res.status}`;
+    throw new Error(errorMsg);
+  }
+  return data;
+}
+
+export async function getEvidence(
+  investigationId: string,
+  evidenceId: string
+): Promise<Evidence> {
+  const res = await fetch(`${API_BASE_URL}/v1/investigations/${investigationId}/evidence/${evidenceId}`, {
+    cache: 'no-store',
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    const errorMsg = data?.error?.message || `Evidence lookup failed with status: ${res.status}`;
+    throw new Error(errorMsg);
+  }
+  return data;
+}
+
+export async function deleteInvestigation(
+  investigationId: string
+): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE_URL}/v1/investigations/${investigationId}`, {
+    method: 'DELETE',
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    const errorMsg = data?.error?.message || `Delete failed with status: ${res.status}`;
     throw new Error(errorMsg);
   }
   return data;

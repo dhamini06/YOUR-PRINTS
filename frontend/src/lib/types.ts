@@ -83,6 +83,7 @@ export interface Investigation {
   };
   created_at: string;
   completed_at?: string;
+  expires_at?: string;
   entities: Entity[];
   relationships: Relationship[];
 }

@@ -140,3 +140,31 @@ async def test_get_investigation_invalid_id():
     assert response.status_code == 400
     data = response.json()
     assert data["error"]["code"] == "INVALID_IDENTIFIER"
+
+
+@pytest.mark.asyncio
+async def test_get_evidence_and_delete_investigation():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # 1. Create
+        create_res = await ac.post(
+            "/api/v1/investigations",
+            json={"target": "evidence_test@company.com", "target_type": "EMAIL"},
+        )
+        inv_id = create_res.json()["id"]
+        relationships = create_res.json().get("relationships") or []
+
+        if relationships and relationships[0].get("evidence_id"):
+            ev_id = relationships[0]["evidence_id"]
+            ev_res = await ac.get(f"/api/v1/investigations/{inv_id}/evidence/{ev_id}")
+            assert ev_res.status_code == 200
+            assert ev_res.json()["id"] == ev_id
+
+        # 2. Delete Investigation
+        del_res = await ac.delete(f"/api/v1/investigations/{inv_id}")
+        assert del_res.status_code == 200
+        assert del_res.json()["status"] == "deleted"
+
+        # 3. Verify it's gone
+        get_res = await ac.get(f"/api/v1/investigations/{inv_id}")
+        assert get_res.status_code == 404

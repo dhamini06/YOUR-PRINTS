@@ -1,13 +1,13 @@
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.config import settings
-from app.domain.models import Investigation, Entity, OptOutTarget, utc_now
+from app.domain.models import Investigation, Entity, Evidence, OptOutTarget, utc_now
 from app.domain.enums import (
     TargetType,
     InvestigationStatus,
@@ -16,6 +16,7 @@ from app.domain.enums import (
 from app.domain.schemas import (
     InvestigationCreateRequest,
     InvestigationResponse,
+    EvidenceSchema,
     ErrorResponse,
 )
 from app.domain.validation import (
@@ -162,3 +163,71 @@ async def get_investigation(
         )
 
     return inv
+
+
+@router.get(
+    "/{investigation_id}/evidence/{evidence_id}",
+    response_model=EvidenceSchema,
+    responses={
+        404: {"model": ErrorResponse, "description": "Evidence not found"},
+    },
+)
+async def get_evidence(
+    investigation_id: str,
+    evidence_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retrieve forensic evidence details and raw observation provenance.
+    """
+    stmt = select(Evidence).where(Evidence.id == evidence_id)
+    res = await db.execute(stmt)
+    evidence = res.scalars().first()
+
+    if not evidence:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "EVIDENCE_NOT_FOUND",
+                "message": f"No evidence record found with identifier: {evidence_id}",
+            },
+        )
+
+    return evidence
+
+
+@router.delete(
+    "/{investigation_id}",
+    status_code=status.HTTP_200_OK,
+    responses={
+        404: {"model": ErrorResponse, "description": "Investigation not found"},
+    },
+)
+async def delete_investigation(
+    investigation_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Immediate hard deletion of investigation records, entities, and evidence upon user request.
+    """
+    stmt = select(Investigation).where(Investigation.id == investigation_id)
+    res = await db.execute(stmt)
+    inv = res.scalars().first()
+
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "INVESTIGATION_NOT_FOUND",
+                "message": f"No investigation found with identifier: {investigation_id}",
+            },
+        )
+
+    await db.delete(inv)
+    await db.commit()
+
+    return {
+        "status": "deleted",
+        "investigation_id": investigation_id,
+        "message": "Investigation and all associated graph nodes and evidence records have been permanently purged.",
+    }
