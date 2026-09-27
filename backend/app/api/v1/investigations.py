@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
@@ -25,8 +25,11 @@ from app.domain.validation import (
     TargetValidationError,
 )
 from app.engine.orchestrator import orchestrator
+from app.security.rate_limit import rate_limiter, target_throttle
+from app.security.turnstile import verify_turnstile_token
 
 router = APIRouter(prefix="/investigations", tags=["Investigations"])
+
 
 
 @router.post(
@@ -41,16 +44,37 @@ router = APIRouter(prefix="/investigations", tags=["Investigations"])
 )
 async def create_investigation(
     req: InvestigationCreateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """
     Initiate a new digital footprint investigation for an email address.
-    
-    Normalizes the email address, verifies opt-out status, initializes the
-    investigation record with an ephemeral TTL, and executes the 5-stage
-    investigation pipeline (discovery, correlation, and evidence linking).
+
+    Applies rate limiting, Turnstile verification, opt-out check, target deduplication,
+    normalizes the email address, initializes the investigation record with an ephemeral
+    TTL, and executes the 5-stage investigation pipeline.
     """
+    # 0. Rate limiting — extract client IP
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    client_ip = client_ip.split(",")[0].strip()
+
+    allowed, reason = await rate_limiter.check(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "RATE_LIMITED", "message": reason},
+        )
+
+    # 0b. Cloudflare Turnstile verification
+    verified, turnstile_reason = await verify_turnstile_token(req.turnstile_token)
+    if not verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "BOT_VERIFICATION_FAILED", "message": turnstile_reason},
+        )
+
     # 1. Syntax & protocol normalization
+
     try:
         canonical_email, local_part, domain = normalize_and_validate_email(req.target)
     except TargetValidationError as e:
@@ -76,6 +100,22 @@ async def create_investigation(
                 "message": "This target identifier has been permanently opted out from public investigations by its owner.",
             },
         )
+
+    # 2b. Target deduplication — return cached result within 4-hour window
+    cached_id = await target_throttle.get_cached(target_hash)
+    if cached_id:
+        cached_stmt = (
+            select(Investigation)
+            .where(Investigation.id == cached_id)
+            .options(
+                selectinload(Investigation.entities),
+                selectinload(Investigation.relationships),
+            )
+        )
+        cached_res = await db.execute(cached_stmt)
+        cached_inv = cached_res.scalars().first()
+        if cached_inv:
+            return cached_inv
 
     # 3. Create Investigation Record
     expires_at = utc_now() + timedelta(hours=settings.INVESTIGATION_TTL_HOURS)
@@ -114,6 +154,11 @@ async def create_investigation(
 
     # 5. Execute 5-Stage Orchestration Pipeline
     completed_inv = await orchestrator.execute_investigation(investigation.id, db)
+
+    # 6. Record rate limit usage and cache the result
+    await rate_limiter.record(client_ip)
+    await target_throttle.record(target_hash, completed_inv.id)
+
 
     return completed_inv
 

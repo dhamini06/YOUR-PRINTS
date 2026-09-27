@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+import asyncio
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,7 @@ from app.config import settings
 from app.core.database import engine, Base
 from app.domain.schemas import HealthResponse, ErrorResponse, ErrorDetail
 from app.api.v1 import api_v1_router
+from app.security.purge_task import async_scheduler
 
 
 @asynccontextmanager
@@ -14,8 +16,15 @@ async def lifespan(app: FastAPI):
     # Initialize DB tables on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Start background data-retention purge task
+    purge_task = asyncio.create_task(async_scheduler())
     yield
-    # Clean up engine on shutdown
+    # Clean up on shutdown
+    purge_task.cancel()
+    try:
+        await purge_task
+    except asyncio.CancelledError:
+        pass
     await engine.dispose()
 
 
@@ -67,3 +76,4 @@ async def healthcheck():
         version="0.1.0",
         timestamp=datetime.now(timezone.utc),
     )
+
