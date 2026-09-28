@@ -90,6 +90,11 @@ class SlidingWindowRateLimiter:
             self._short[ip_key].append(now)
             self._long[ip_key].append(now)
 
+    def reset(self) -> None:
+        """Reset all rate limiter windows (used primarily for test isolation)."""
+        self._short.clear()
+        self._long.clear()
+
 
 class TargetThrottleCache:
     """
@@ -120,7 +125,12 @@ class TargetThrottleCache:
         async with self._lock:
             self._cache[target_hash] = (investigation_id, time.time())
 
+    def reset(self) -> None:
+        """Reset the cache (used primarily for test isolation)."""
+        self._cache.clear()
+
 
 # Singleton instances shared across the app process
 rate_limiter = SlidingWindowRateLimiter()
 target_throttle = TargetThrottleCache()
+

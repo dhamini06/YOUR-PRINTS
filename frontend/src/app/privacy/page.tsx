@@ -2,22 +2,36 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Shield, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Shield, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { optOutEmail } from '@/lib/api';
+
 
 export default function PrivacyPage() {
-  const [optOutEmail, setOptOutEmail] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleOptOut = (e: React.FormEvent) => {
+  const handleOptOut = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!optOutEmail.includes('@') || !optOutEmail.includes('.')) {
+    if (!emailInput.includes('@') || !emailInput.includes('.')) {
       setError('Please enter a valid email address to request exclusion.');
       return;
     }
     setError(null);
-    setSubmitted(true);
+    setLoading(true);
+    try {
+      const res = await optOutEmail(emailInput.trim());
+      setSuccessMessage(res.message);
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to submit opt-out request. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   return (
     <div className="flex-1 hairline-grid px-6 py-12 md:py-20">
@@ -64,16 +78,25 @@ export default function PrivacyPage() {
               <div className="flex flex-col sm:flex-row items-stretch gap-2">
                 <input
                   type="email"
-                  value={optOutEmail}
-                  onChange={(e) => setOptOutEmail(e.target.value)}
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
                   placeholder="Enter your email address to opt out"
-                  className="flex-1 px-4 py-3 bg-[#FBFBFA] border border-[#E5E4DE] font-mono text-xs text-[#111110] placeholder-[#9E9D97] focus:outline-none focus:border-[#111110]"
+                  disabled={loading}
+                  className="flex-1 px-4 py-3 bg-[#FBFBFA] border border-[#E5E4DE] font-mono text-xs text-[#111110] placeholder-[#9E9D97] focus:outline-none focus:border-[#111110] disabled:opacity-50"
                 />
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-[#111110] text-white hover:bg-[#2A2A28] font-mono text-xs uppercase tracking-wider shrink-0 transition-colors"
+                  disabled={loading}
+                  className="px-6 py-3 bg-[#111110] text-white hover:bg-[#2A2A28] font-mono text-xs uppercase tracking-wider shrink-0 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  Submit Opt-Out Request
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Recording...</span>
+                    </>
+                  ) : (
+                    <span>Submit Opt-Out Request</span>
+                  )}
                 </button>
               </div>
 
@@ -85,29 +108,31 @@ export default function PrivacyPage() {
               )}
 
               <p className="text-[11px] font-mono text-[#64635E]">
-                * To prevent unauthorized blocking of third-party domains, an automated verification token is sent to the address to verify ownership before blacklisting.
+                * Only a salted HMAC-SHA256 cryptographic hash of your normalized email is stored in the exclusion registry. The plaintext address is never written to disk.
               </p>
             </form>
           ) : (
-            <div className="p-4 bg-[#F4F3EF] border border-[#E5E4DE] space-y-2 text-xs font-mono">
+            <div className="p-4 bg-[#F4F3EF] border border-[#E5E4DE] space-y-3 text-xs font-mono">
               <div className="text-[#111110] font-bold flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-[#111110]" />
-                VERIFICATION REQUEST RECORDED (PHASE 1 PREVIEW)
+                TARGET PERMANENTLY EXCLUDED
               </div>
-              <p className="text-[#64635E]">
-                In Phase 3 API implementation, a confirmation link will be dispatched to <span className="font-semibold text-[#111110]">{optOutEmail}</span>. Upon confirmation, its cryptographic SHA-256 hash is added to the permanent exclusion registry.
+              <p className="text-[#64635E] leading-relaxed">
+                {successMessage || `The cryptographic hash for ${emailInput} has been added to the permanent exclusion registry. Any future attempt to investigate this target will immediately be blocked with HTTP 403.`}
               </p>
               <button
                 onClick={() => {
                   setSubmitted(false);
-                  setOptOutEmail('');
+                  setEmailInput('');
+                  setSuccessMessage('');
                 }}
-                className="text-[#111110] underline pt-1 font-semibold"
+                className="text-[#111110] underline pt-1 font-semibold block"
               >
                 Submit another request
               </button>
             </div>
           )}
+
         </div>
 
         {/* Governance Principles */}

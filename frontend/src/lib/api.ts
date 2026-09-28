@@ -79,3 +79,35 @@ export async function deleteInvestigation(
   }
   return data;
 }
+
+export async function optOutEmail(email: string): Promise<{ status: string; message: string }> {
+  const res = await fetch(`${API_BASE_URL}/v1/opt-out`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    const errorMsg = data?.error?.message || `Opt-out request failed with status: ${res.status}`;
+    throw new Error(errorMsg);
+  }
+  return data;
+}
+
+export async function checkOptOutStatus(email: string): Promise<{ status: string; message: string }> {
+  const params = new URLSearchParams({ email });
+  const res = await fetch(`${API_BASE_URL}/v1/opt-out/check?${params.toString()}`, {
+    cache: 'no-store',
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    const errorMsg = data?.error?.message || `Status check failed with status: ${res.status}`;
+    throw new Error(errorMsg);
+  }
+  return data;
+}
+

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 
 from app.main import app as fastapi_app
 from app.core.database import Base, get_db
+from app.security.rate_limit import rate_limiter, target_throttle
 import app.domain.models  # Ensure all models are registered in Base.metadata
 
 TEST_DB_FILE = "./test_temp.db"
@@ -31,12 +32,16 @@ async def override_get_db():
 fastapi_app.dependency_overrides[get_db] = override_get_db
 
 
-
 @pytest.fixture(autouse=True)
 async def reset_test_database():
-    """Create all tables before each test; drop all after each test."""
+    """Create all tables before each test; reset rate limits; drop all after each test."""
+    rate_limiter.reset()
+    target_throttle.reset()
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    rate_limiter.reset()
+    target_throttle.reset()
+
