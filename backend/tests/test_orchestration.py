@@ -181,6 +181,23 @@ async def test_orchestrator_full_execution():
         status_code=200,
     )
 
+    mock_exposure_result = ProviderResult(
+        provider_id="provider-exposure",
+        status=ProviderStatus.SUCCESS,
+        status_code=200,
+        raw_payload={"breaches": ["Dropbox_2012"]},
+        extracted_signals=[
+            {
+                "signal_type": "EXPOSURE_EVENT",
+                "breach_name": "Dropbox_2012",
+                "breach_title": "Dropbox 2012",
+                "breach_date": "2012-07-01",
+                "compromised_data_classes": ["Email address", "Passwords"],
+                "description": "Historical Dropbox disclosure.",
+            }
+        ],
+    )
+
     with patch("app.providers.registry.provider_registry.execute_all_for_pivot") as mock_exec:
         async def fake_pivot(pivot_type, pivot_val, timeout_sec=4.0):
             if pivot_type == "email":
@@ -189,6 +206,8 @@ async def test_orchestrator_full_execution():
                 return [mock_dns_result]
             elif pivot_type == "username":
                 return [mock_github_result, mock_empty_result]
+            elif pivot_type == "exposure":
+                return [mock_exposure_result]
             return []
 
         mock_exec.side_effect = fake_pivot
@@ -218,13 +237,15 @@ async def test_orchestrator_full_execution():
             # Assertions
             assert completed_inv.status == InvestigationStatus.COMPLETED
             assert completed_inv.current_stage == "05_BUILDING_DIGITAL_FOOTPRINT"
-            assert completed_inv.summary_stats["total_entities"] >= 3
+            assert completed_inv.summary_stats["total_entities"] >= 4
             assert completed_inv.summary_stats["confirmed_links"] >= 1
-            assert len(completed_inv.raw_signals) >= 3
-            assert len(completed_inv.relationships) >= 2
+            assert completed_inv.summary_stats["exposure_count"] == 1
+            assert len(completed_inv.raw_signals) >= 4
+            assert len(completed_inv.relationships) >= 3
 
             # Check that raw signals contain SHA-256 hashes
             for sig in completed_inv.raw_signals:
                 assert len(sig.payload_sha256) == 64
+
 
     await test_engine.dispose()

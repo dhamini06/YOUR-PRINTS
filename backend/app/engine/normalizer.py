@@ -257,4 +257,37 @@ class SignalNormalizer:
                         )
                     )
 
+            # 8. Exposure & Public Breach Events
+            elif sig_type == "EXPOSURE_EVENT":
+                b_name = signal.get("breach_name", "unknown")
+                b_title = signal.get("breach_title", b_name.replace("_", " ").title())
+                b_date = signal.get("breach_date", "Historical Disclosure")
+                data_classes = signal.get("compromised_data_classes", ["Email address"])
+                domain = signal.get("domain", "")
+
+                res.entities.append(
+                    NormalizedEntityItem(
+                        canonical_value=f"exposure:{b_name.lower()}",
+                        entity_type=EntityType.EXPOSURE_EVENT,
+                        display_label=f"Breach Event: {b_title}",
+                        attributes={
+                            "breach_name": b_name,
+                            "breach_title": b_title,
+                            "breach_date": b_date,
+                            "compromised_data_classes": data_classes,
+                            "domain": domain,
+                            "description": signal.get("description", ""),
+                        },
+                        evidence=NormalizedEvidenceData(
+                            source_label=signal.get("source", "Public Breach Disclosure Catalog"),
+                            source_url=f"https://xposedornot.com" if not domain else f"https://{domain}",
+                            discovery_method="PUBLIC_DIRECTORY",
+                            observation_confidence=ObservationConfidence.RELIABLE,
+                            observed_value=f"{b_title} ({b_date})",
+                            rationale=f"Email address appeared in public breach disclosure catalog for '{b_title}' with compromised attributes: {', '.join(data_classes)}.",
+                        ),
+                    )
+                )
+
         return res
+

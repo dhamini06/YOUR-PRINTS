@@ -140,4 +140,20 @@ class GraphCorrelator:
                     )
                 )
 
+            elif e.entity_type == EntityType.EXPOSURE_EVENT:
+                # Target Email -> Exposure Incident Record
+                b_title = e.attributes.get("breach_title", e.display_label)
+                b_date = e.attributes.get("breach_date", "Historical")
+                edges.append(
+                    CorrelatedEdge(
+                        source_canonical=target_email,
+                        target_canonical=e.canonical_value,
+                        relationship_type=RelationshipType.REPORTED_IN,
+                        confidence=RelationshipConfidence.UNVERIFIED,
+                        inference_rationale=f"Target email appeared in public security disclosure catalog record '{b_title}' ({b_date}).",
+                        evidence_data=e.evidence,
+                    )
+                )
+
         return edges
+

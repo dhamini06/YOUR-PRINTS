@@ -33,8 +33,9 @@ export default function InvestigationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Active View Tab: 'graph' | 'matrix' | 'timeline' | 'audit'
-  const [activeTab, setActiveTab] = useState<'graph' | 'matrix' | 'timeline' | 'audit'>('graph');
+  // Active View Tab: 'graph' | 'matrix' | 'timeline' | 'audit' | 'exposure'
+  const [activeTab, setActiveTab] = useState<'graph' | 'matrix' | 'timeline' | 'audit' | 'exposure'>('graph');
+
 
   // Evidence Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -224,7 +225,7 @@ export default function InvestigationDetailPage() {
       {/* TELEMETRY METRICS BAR */}
       {/* ========================================================================= */}
       <div className="border-b border-[#E5E4DE] bg-[#FBFBFA] px-6 py-4">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-5 gap-4 font-mono text-xs">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 font-mono text-xs">
           <div className="p-3 bg-white border border-[#E5E4DE]">
             <div className="text-[#64635E] text-[10px] uppercase">TOTAL ENTITIES</div>
             <div className="text-lg font-bold text-[#111110] mt-0.5">{summary_stats?.total_entities || entities.length}</div>
@@ -248,6 +249,17 @@ export default function InvestigationDetailPage() {
             <div className="text-lg font-bold text-[#64635E] mt-0.5">{summary_stats?.possible_matches || 0}</div>
           </div>
           <div className="p-3 bg-white border border-[#E5E4DE]">
+            <div className="text-[#64635E] text-[10px] uppercase">EXPOSURES DETECTED</div>
+            <div className={`text-lg font-bold mt-0.5 flex items-center gap-1.5 ${
+              (summary_stats?.exposure_count || 0) > 0 ? 'text-[#B91C1C]' : 'text-[#64635E]'
+            }`}>
+              <AlertTriangle className={`w-3.5 h-3.5 ${
+                (summary_stats?.exposure_count || 0) > 0 ? 'text-[#B91C1C]' : 'text-[#9E9D97]'
+              }`} />
+              <span>{summary_stats?.exposure_count || 0}</span>
+            </div>
+          </div>
+          <div className="p-3 bg-white border border-[#E5E4DE]">
             <div className="text-[#64635E] text-[10px] uppercase">PROVIDERS POLLED</div>
             <div className="text-lg font-bold text-[#111110] mt-0.5">{Object.keys(provider_states || {}).length}</div>
           </div>
@@ -258,10 +270,10 @@ export default function InvestigationDetailPage() {
       {/* VIEW SELECTOR TABS */}
       {/* ========================================================================= */}
       <div className="border-b border-[#E5E4DE] bg-white px-6">
-        <div className="max-w-7xl mx-auto flex items-center space-x-8 font-mono text-xs uppercase tracking-wider">
+        <div className="max-w-7xl mx-auto flex items-center space-x-6 sm:space-x-8 font-mono text-xs uppercase tracking-wider overflow-x-auto">
           <button
             onClick={() => setActiveTab('graph')}
-            className={`py-4 flex items-center gap-2 border-b-2 transition-colors ${
+            className={`py-4 flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'graph'
                 ? 'border-[#111110] text-[#111110] font-bold'
                 : 'border-transparent text-[#64635E] hover:text-[#111110]'
@@ -272,7 +284,7 @@ export default function InvestigationDetailPage() {
           </button>
           <button
             onClick={() => setActiveTab('matrix')}
-            className={`py-4 flex items-center gap-2 border-b-2 transition-colors ${
+            className={`py-4 flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'matrix'
                 ? 'border-[#111110] text-[#111110] font-bold'
                 : 'border-transparent text-[#64635E] hover:text-[#111110]'
@@ -283,7 +295,7 @@ export default function InvestigationDetailPage() {
           </button>
           <button
             onClick={() => setActiveTab('timeline')}
-            className={`py-4 flex items-center gap-2 border-b-2 transition-colors ${
+            className={`py-4 flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'timeline'
                 ? 'border-[#111110] text-[#111110] font-bold'
                 : 'border-transparent text-[#64635E] hover:text-[#111110]'
@@ -294,7 +306,7 @@ export default function InvestigationDetailPage() {
           </button>
           <button
             onClick={() => setActiveTab('audit')}
-            className={`py-4 flex items-center gap-2 border-b-2 transition-colors ${
+            className={`py-4 flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'audit'
                 ? 'border-[#111110] text-[#111110] font-bold'
                 : 'border-transparent text-[#64635E] hover:text-[#111110]'
@@ -303,8 +315,20 @@ export default function InvestigationDetailPage() {
             <Shield className="w-4 h-4" />
             <span>04 Forensic Audit</span>
           </button>
+          <button
+            onClick={() => setActiveTab('exposure')}
+            className={`py-4 flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'exposure'
+                ? 'border-[#B91C1C] text-[#B91C1C] font-bold'
+                : 'border-transparent text-[#64635E] hover:text-[#111110]'
+            }`}
+          >
+            <AlertTriangle className={`w-4 h-4 ${(summary_stats?.exposure_count || 0) > 0 ? 'text-[#B91C1C]' : 'text-[#64635E]'}`} />
+            <span>05 Exposures ({summary_stats?.exposure_count || 0})</span>
+          </button>
         </div>
       </div>
+
 
       {/* ========================================================================= */}
       {/* MAIN VIEW CONTENT */}
@@ -519,7 +543,103 @@ export default function InvestigationDetailPage() {
             </div>
           </div>
         )}
+
+        {/* TAB 5: PUBLIC EXPOSURES & BREACH INCIDENTS */}
+        {activeTab === 'exposure' && (
+          <div className="space-y-6 font-mono text-xs">
+            <div className="bg-[#FFF1F2] border border-[#FECDD3] p-6 space-y-3">
+              <div className="font-bold text-[#B91C1C] text-sm uppercase tracking-wider flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-[#B91C1C]" />
+                PUBLIC SECURITY INCIDENT REPOSITORY
+              </div>
+              <p className="font-sans text-xs text-[#881337] leading-relaxed">
+                Security incidents and data disclosure events are reported for historical risk awareness. The presence of an email in a public disclosure catalog proves an external third-party security incident occurred — it does not imply account compromise or personal culpability. Stolen plaintext passwords and exploit records are strictly excluded.
+              </p>
+            </div>
+
+            {entities.filter((e) => e.entity_type === 'EXPOSURE_EVENT').length === 0 ? (
+              <div className="bg-white border border-[#E5E4DE] p-12 text-center space-y-3">
+                <CheckCircle2 className="w-8 h-8 text-[#111110] mx-auto opacity-70" />
+                <div className="text-sm font-bold text-[#111110] uppercase">Zero Public Exposures Detected</div>
+                <p className="font-sans text-xs text-[#64635E] max-w-md mx-auto">
+                  No records matching &ldquo;{investigation.target_value}&rdquo; were found in our public security disclosure catalogs during this investigation.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-xs text-[#64635E] uppercase tracking-wider">
+                  Discovered Incident Disclosures ({entities.filter((e) => e.entity_type === 'EXPOSURE_EVENT').length})
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {entities
+                    .filter((e) => e.entity_type === 'EXPOSURE_EVENT')
+                    .map((item) => {
+                      const dataClasses: string[] = item.attributes?.compromised_data_classes || [];
+                      return (
+                        <div
+                          key={item.id}
+                          className="bg-white border border-[#E5E4DE] hover:border-[#111110] p-6 space-y-4 transition-colors"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <div className="text-[10px] text-[#B91C1C] uppercase font-bold tracking-wider">
+                                {item.attributes?.breach_date || 'Historical Event'}
+                              </div>
+                              <h4 className="text-base font-serif font-bold text-[#111110]">
+                                {item.attributes?.breach_title || item.display_label}
+                              </h4>
+                            </div>
+                            <span className="px-2 py-0.5 bg-[#FFF1F2] border border-[#FECDD3] text-[#B91C1C] font-mono text-[10px] uppercase font-bold">
+                              EXPOSURE EVENT
+                            </span>
+                          </div>
+
+                          {item.attributes?.description && (
+                            <p className="font-sans text-xs text-[#64635E] line-clamp-3 leading-relaxed">
+                              {item.attributes.description.replace(/<[^>]*>?/gm, '')}
+                            </p>
+                          )}
+
+                          {dataClasses.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-[#E5E4DE]">
+                              <div className="text-[10px] text-[#64635E] uppercase font-bold">
+                                Compromised Data Classes:
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {dataClasses.map((dc, i) => (
+                                  <span
+                                    key={i}
+                                    className="px-2 py-0.5 bg-[#FBFBFA] border border-[#E5E4DE] text-[10px] text-[#111110]"
+                                  >
+                                    {dc}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="pt-2 flex items-center justify-between border-t border-[#E5E4DE]">
+                            <span className="text-[10px] text-[#64635E] uppercase">
+                              Status: Unverified Link
+                            </span>
+                            <button
+                              onClick={() => handleSelectEntity(item)}
+                              className="text-xs text-[#111110] hover:underline font-semibold flex items-center gap-1"
+                            >
+                              <span>Inspect Provenance</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
 
       {/* Forensic Evidence Drawer */}
       <EvidenceDrawer

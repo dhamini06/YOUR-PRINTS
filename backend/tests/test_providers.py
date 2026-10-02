@@ -9,7 +9,9 @@ from app.providers.gravatar_provider import GravatarProvider
 from app.providers.github_provider import GitHubProvider
 from app.providers.rdap_provider import RDAPProvider
 from app.providers.keybase_provider import KeybaseProvider
+from app.providers.exposure_provider import ExposureProvider
 from app.providers.registry import ProviderRegistry
+
 
 
 # ==============================================================================
@@ -296,3 +298,62 @@ async def test_provider_registry_discovery():
     provider_ids = [p.provider_id for p in email_providers]
     assert "provider-dns" in provider_ids
     assert "provider-gravatar" in provider_ids
+    assert "provider-exposure" in provider_ids
+
+    exposure_providers = registry.get_providers_for_pivot("exposure")
+    assert len(exposure_providers) >= 1
+    assert "provider-exposure" in [p.provider_id for p in exposure_providers]
+
+
+# ==============================================================================
+# 7. Exposure Provider Tests
+# ==============================================================================
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_exposure_provider_success():
+    provider = ExposureProvider()
+    mock_payload = {
+        "breaches": [["Dropbox_2012", "Adobe_2013"]]
+    }
+    respx.get("https://api.xposedornot.com/v1/check-email/breached@example.com").respond(
+        status_code=200, json=mock_payload
+    )
+
+    result = await provider.query("exposure", "breached@example.com")
+    assert result.status == ProviderStatus.SUCCESS
+    assert result.status_code == 200
+    assert len(result.extracted_signals) == 2
+
+    titles = [s["breach_title"] for s in result.extracted_signals]
+    assert "Dropbox 2012" in titles
+    assert "Adobe 2013" in titles
+    assert result.extracted_signals[0]["signal_type"] == "EXPOSURE_EVENT"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_exposure_provider_404_clean():
+    provider = ExposureProvider()
+    respx.get("https://api.xposedornot.com/v1/check-email/clean@example.com").respond(
+        status_code=404, json={"Error": "Not found"}
+    )
+
+    result = await provider.query("exposure", "clean@example.com")
+    assert result.status == ProviderStatus.NO_RESULTS
+    assert result.status_code == 404
+    assert len(result.extracted_signals) == 0
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_exposure_provider_rate_limited():
+    provider = ExposureProvider()
+    respx.get("https://api.xposedornot.com/v1/check-email/throttled@example.com").respond(
+        status_code=429
+    )
+
+    result = await provider.query("exposure", "throttled@example.com")
+    assert result.status == ProviderStatus.RATE_LIMITED
+    assert result.status_code == 429
+

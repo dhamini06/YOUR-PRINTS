@@ -137,11 +137,40 @@ class InvestigationOrchestrator:
         inv.current_stage = "04_ANALYSING_EXPOSURE"
         await db.flush()
 
+        exposure_results = await provider_registry.execute_all_for_pivot("exposure", target_email)
+        for result in exposure_results:
+            provider_states[result.provider_id] = result.status.value
+
+            payload_str = json.dumps(result.raw_payload or {}, sort_keys=True)
+            payload_hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
+
+            raw_signal = RawSignal(
+                investigation_id=inv.id,
+                provider_id=result.provider_id,
+                query_type="EXPOSURE_CATALOG_LOOKUP",
+                query_target=target_email,
+                http_status=result.status_code,
+                payload=result.raw_payload or {},
+                payload_sha256=payload_hash,
+            )
+            inv.raw_signals.append(raw_signal)
+            db.add(raw_signal)
+            await db.flush()
+            raw_signal_map[result.provider_id] = raw_signal.id
+
+            normalized = SignalNormalizer.normalize_provider_result(
+                result=result,
+                target_email=target_email,
+                target_domain=domain,
+            )
+            all_normalized_entities.extend(normalized.entities)
+
         # 5. Stage 05: Building Digital Footprint & Graph Assembly
         inv.current_stage = "05_BUILDING_DIGITAL_FOOTPRINT"
 
         # Deduplicate and persist entities in DB
         entity_db_map: Dict[str, str] = {}  # canonical_value -> entity_id
+
 
         # Find existing root entity
         for ent in inv.entities:
@@ -213,14 +242,16 @@ class InvestigationOrchestrator:
                     possible_count += 1
 
         # Calculate final stats & status
+        exposure_count = sum(1 for e in all_normalized_entities if e.entity_type == EntityType.EXPOSURE_EVENT)
         inv.provider_states = provider_states
         inv.summary_stats = {
             "total_entities": len(entity_db_map),
             "confirmed_links": confirmed_count,
             "strong_matches": strong_count,
             "possible_matches": possible_count,
-            "exposure_count": 0,
+            "exposure_count": exposure_count,
         }
+
 
         # Terminal status evaluation
         successful_providers = [s for s in provider_states.values() if s in ("SUCCESS", "NO_RESULTS")]

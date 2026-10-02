@@ -7,6 +7,7 @@ from app.providers.rdap_provider import RDAPProvider
 from app.providers.gravatar_provider import GravatarProvider
 from app.providers.github_provider import GitHubProvider
 from app.providers.keybase_provider import KeybaseProvider
+from app.providers.exposure_provider import ExposureProvider
 
 
 class ProviderRegistry:
@@ -25,6 +26,8 @@ class ProviderRegistry:
         self.register(GravatarProvider())
         self.register(GitHubProvider())
         self.register(KeybaseProvider())
+        self.register(ExposureProvider())
+
 
     def register(self, provider: BaseProvider):
         self._providers[provider.provider_id] = provider

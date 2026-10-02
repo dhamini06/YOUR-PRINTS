@@ -6,6 +6,7 @@ from app.providers.rdap_provider import RDAPProvider
 from app.providers.gravatar_provider import GravatarProvider
 from app.providers.github_provider import GitHubProvider
 from app.providers.keybase_provider import KeybaseProvider
+from app.providers.exposure_provider import ExposureProvider
 
 __all__ = [
     "BaseProvider",
@@ -17,4 +18,6 @@ __all__ = [
     "GravatarProvider",
     "GitHubProvider",
     "KeybaseProvider",
+    "ExposureProvider",
 ]
+
