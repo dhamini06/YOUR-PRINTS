@@ -25,16 +25,27 @@ services:
       dockerfile: Dockerfile
     container_name: yourprints-backend
     environment:
-      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-yourprints_user}:${DB_PASSWORD:-yourprints_insecure_dev_password}@postgres:5432/${DB_NAME:-yourprints_db}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      INVESTIGATION_TIMEOUT_SECONDS: ${INVESTIGATION_TIMEOUT_SECONDS:-15}
+      PER_PROVIDER_TIMEOUT_SECONDS: ${PER_PROVIDER_TIMEOUT_SECONDS:-5}
+      MAX_CONCURRENT_INVESTIGATIONS: ${MAX_CONCURRENT_INVESTIGATIONS:-10}
+      INVESTIGATION_TTL_HOURS: ${INVESTIGATION_TTL_HOURS:-48}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      HIBP_API_KEY: ${HIBP_API_KEY:-}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
   frontend:
@@ -43,12 +54,14 @@ services:
       dockerfile: Dockerfile
     container_name: yourprints-frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      # In container-to-container networking, the frontend server calls backend via container name
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
