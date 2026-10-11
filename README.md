@@ -119,18 +119,21 @@ YOUR-PRINTS/
 │   │   │   ├── gravatar_provider.py   # Gravatar avatar & profile lookup
 │   │   │   ├── github_provider.py     # GitHub public account inspector
 │   │   │   ├── keybase_provider.py    # Keybase public identity proofs
+│   │   │   ├── exposure_provider.py   # Public breach & exposure catalog (XposedOrNot & HIBP)
 │   │   │   └── registry.py            # Unified provider registry
 │   │   └── security/
 │   │       ├── ssrf_guard.py          # Outbound network IP validation
 │   │       ├── rate_limit.py          # Sliding window rate limiter & target throttle
 │   │       ├── turnstile.py           # Cloudflare Turnstile token validation
 │   │       └── purge_task.py          # 48-hour retention auto-purge scheduler
-│   └── tests/                         # Pytest test suite (67 unit & E2E tests)
+│   ├── migrations/                    # Alembic schema versions & async migration runner
+│   ├── alembic.ini                    # Alembic environment configuration
+│   └── tests/                         # Pytest test suite (70 unit & E2E tests)
 ├── frontend/
 │   └── src/
 │       ├── app/
 │       │   ├── page.tsx               # Editorial landing page & entry prompt
-│       │   ├── investigate/[id]/      # Graph, Entity Matrix, Timeline, Evidence
+│       │   ├── investigate/[id]/      # Graph, Entity Matrix, Timeline, Evidence, Exposures
 │       │   ├── methodology/page.tsx   # Epistemology & confidence whitepaper
 │       │   └── privacy/page.tsx       # Live Opt-Out Portal & Retention Policy
 │       ├── components/
@@ -140,7 +143,7 @@ YOUR-PRINTS/
 │       └── lib/
 │           ├── api.ts                 # Type-safe API client
 │           └── types.ts               # Shared TypeScript domain interfaces
-├── docker-compose.yml                 # PostgreSQL, FastAPI, and Next.js orchestration
+├── docker-compose.yml                 # Hardened PostgreSQL, FastAPI, and Next.js orchestration
 ├── .env.example                       # Environment configuration template
 └── README.md
 ```
@@ -168,9 +171,12 @@ YOUR-PRINTS/
 cd backend
 python -m venv .venv
 source .venv/bin/activate  # Or on Windows: .venv\Scripts\activate
-pip install -e .
+pip install -r requirements.txt
 
-# Run all 67 test suites
+# Run database migrations
+python -m alembic upgrade head
+
+# Run all 70 test suites
 pytest
 ```
 
