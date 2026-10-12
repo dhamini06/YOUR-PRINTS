@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { ArrowRight, Shield, CheckCircle2, EyeOff, Search, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { ArrowRight, Shield, CheckCircle2, EyeOff, Search, Loader2, Clock } from 'lucide-react';
 import { createInvestigation } from '@/lib/api';
 import { Investigation } from '@/lib/types';
 
@@ -9,11 +10,54 @@ interface InvestigationInputProps {
   onInvestigatePreview?: (email: string) => void;
 }
 
+interface RecentItem {
+  id: string;
+  target: string;
+  time: string;
+}
+
 export default function InvestigationInput({ onInvestigatePreview }: InvestigationInputProps) {
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeInvestigation, setActiveInvestigation] = useState<Investigation | null>(null);
+  const [recentSearches, setRecentSearches] = useState<RecentItem[]>([]);
+
+  // Load recent searches from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('yourprints_recent_investigations');
+      if (stored) {
+        setRecentSearches(JSON.parse(stored));
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
+
+  const saveRecent = (id: string, target: string) => {
+    try {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const updated = [
+        { id, target, time: timeStr },
+        ...recentSearches.filter((item) => item.target !== target),
+      ].slice(0, 5);
+      setRecentSearches(updated);
+      localStorage.setItem('yourprints_recent_investigations', JSON.stringify(updated));
+    } catch {
+      // Ignore
+    }
+  };
+
+  const clearRecent = () => {
+    try {
+      localStorage.removeItem('yourprints_recent_investigations');
+      setRecentSearches([]);
+    } catch {
+      // Ignore
+    }
+  };
 
   // RFC 5322 compliant regex for client-side initial validation
   const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
@@ -39,12 +83,12 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
       // Connect to Phase 2 Investigation API endpoint
       const result = await createInvestigation(cleanEmail);
       setActiveInvestigation(result);
+      saveRecent(result.id, cleanEmail);
 
       if (onInvestigatePreview) {
         onInvestigatePreview(cleanEmail);
       }
     } catch (err: any) {
-      // Fallback display if backend is offline in local preview mode
       setError(err.message || 'Failed to initialize investigation.');
     } finally {
       setIsSubmitting(false);
@@ -106,6 +150,37 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
         )}
       </form>
 
+      {/* Recent Investigations (Local Browser Session) */}
+      {recentSearches.length > 0 && !activeInvestigation && (
+        <div className="pt-1">
+          <div className="flex items-center justify-between text-[11px] font-mono text-[#64635E] mb-2">
+            <span className="uppercase tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3 h-3 text-[#111110]" />
+              <span>Recent Dossiers (Local Session)</span>
+            </span>
+            <button
+              onClick={clearRecent}
+              className="hover:text-[#111110] underline text-[10px] uppercase tracking-wider"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {recentSearches.map((item) => (
+              <Link
+                key={item.id}
+                href={`/investigate/${item.id}`}
+                className="px-3 py-1.5 bg-white border border-[#E5E4DE] hover:border-[#111110] text-[#111110] text-xs font-mono flex items-center gap-2 group transition-colors shadow-subtle"
+              >
+                <span className="font-semibold">{item.target}</span>
+                <span className="text-[10px] text-[#9E9D97] group-hover:text-[#64635E]">{item.time}</span>
+                <ArrowRight className="w-3 h-3 text-[#64635E] group-hover:translate-x-0.5 group-hover:text-[#111110] transition-all" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Trust & Methodology Micro-Badges */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
         <div className="flex items-center space-x-2 text-[11px] font-mono text-[#64635E]">
@@ -151,31 +226,19 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
           <div className="space-y-3">
             <div className="text-xs font-mono text-[#64635E] uppercase tracking-wider flex items-center justify-between">
               <span>Investigation Lifecycle Pipeline</span>
-              <span className="text-[10px] text-[#111110]">ROOT ENTITY CREATED</span>
+              <span className="text-[10px] text-[#111110]">PIPELINE EXECUTED</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
               {stages.map((stage) => (
                 <div
                   key={stage.num}
-                  className={`p-3 border flex flex-col justify-between transition-colors ${
-                    stage.num === '01'
-                      ? 'bg-[#111110] text-white border-[#111110]'
-                      : 'bg-[#FBFBFA] text-[#111110] border-[#E5E4DE]'
-                  }`}
+                  className="p-3 border flex flex-col justify-between transition-colors bg-[#FBFBFA] text-[#111110] border-[#E5E4DE]"
                 >
-                  <div
-                    className={`font-mono text-[10px] font-semibold ${
-                      stage.num === '01' ? 'text-[#C8FF00]' : 'text-[#64635E]'
-                    }`}
-                  >
-                    {stage.num} {stage.num === '01' && '• ACTIVE'}
+                  <div className="font-mono text-[10px] font-semibold text-[#64635E]">
+                    {stage.num} • READY
                   </div>
                   <div className="font-mono text-xs font-bold mt-1">{stage.title}</div>
-                  <div
-                    className={`font-sans text-[11px] mt-2 leading-tight ${
-                      stage.num === '01' ? 'text-[#D6D5CD]' : 'text-[#64635E]'
-                    }`}
-                  >
+                  <div className="font-sans text-[11px] mt-2 leading-tight text-[#64635E]">
                     {stage.desc}
                   </div>
                 </div>
@@ -183,20 +246,29 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
             </div>
           </div>
 
-          <div className="p-4 bg-[#F4F3EF] border border-[#E5E4DE] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono">
-            <div className="flex items-center space-x-2 text-[#64635E]">
-              <span className="w-2 h-2 rounded-full bg-[#C8FF00] border border-[#111110]/30"></span>
-              <span>Investigation created & persisted in database. Ready for Phase 3 provider execution.</span>
+          <div className="p-4 bg-[#F4F3EF] border border-[#E5E4DE] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-mono">
+            <div className="flex items-center space-x-2 text-[#111110]">
+              <span className="w-2 h-2 rounded-full bg-[#C8FF00] border border-[#111110]/30 animate-pulse"></span>
+              <span>Investigation synthesized. Full digital footprint graph and evidence ready.</span>
             </div>
-            <button
-              onClick={() => {
-                setActiveInvestigation(null);
-                setEmail('');
-              }}
-              className="text-[#111110] underline font-semibold hover:text-[#64635E]"
-            >
-              Start New Investigation
-            </button>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Link
+                href={`/investigate/${activeInvestigation.id}`}
+                className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#111110] text-[#C8FF00] font-bold hover:bg-[#2A2A28] flex items-center justify-center gap-2 uppercase tracking-wider transition-colors shadow-subtle"
+              >
+                <span>View Full Dossier</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <button
+                onClick={() => {
+                  setActiveInvestigation(null);
+                  setEmail('');
+                }}
+                className="text-[#64635E] hover:text-[#111110] underline text-[11px]"
+              >
+                New Search
+              </button>
+            </div>
           </div>
         </div>
       )}
