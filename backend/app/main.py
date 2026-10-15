@@ -68,6 +68,7 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
 app.include_router(api_v1_router, prefix="/api")
 
 
+@app.get("/health", response_model=HealthResponse, tags=["Health"], include_in_schema=False)
 @app.get("/api/health", response_model=HealthResponse, tags=["Health"])
 async def healthcheck():
     """System health check endpoint."""

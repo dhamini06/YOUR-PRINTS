@@ -13,3 +13,16 @@ async def test_health_endpoint():
     assert data["status"] == "healthy"
     assert data["version"] == "0.1.0"
     assert "timestamp" in data
+
+
+@pytest.mark.asyncio
+async def test_root_health_endpoint_alias():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert data["version"] == "0.1.0"
+    assert "timestamp" in data
+
