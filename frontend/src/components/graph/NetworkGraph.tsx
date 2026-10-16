@@ -1,9 +1,19 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Entity, Relationship } from '@/lib/types';
-import { ZoomIn, ZoomOut, RotateCcw, Pause, Play, Eye } from 'lucide-react';
+import {
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Pause,
+  Play,
+  Eye,
+  Maximize2,
+  Minimize2,
+  Filter,
+} from 'lucide-react';
 
 interface NetworkGraphProps {
   entities: Entity[];
@@ -44,8 +54,28 @@ export default function NetworkGraph({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeTypeFilter, setActiveTypeFilter] = useState('ALL');
+
   const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null);
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+
+  // Available entity types for filtering
+  const availableTypes = useMemo(() => {
+    const types = Array.from(new Set(entities.map((e) => e.entity_type)));
+    return ['ALL', ...types];
+  }, [entities]);
+
+  // Handle ESC key for exiting fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || entities.length === 0) return;
@@ -127,6 +157,12 @@ export default function NetworkGraph({
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', '#111110');
 
+    // Helper to determine if a node or edge is dimmed by activeTypeFilter
+    const isNodeDimmed = (d: D3Node) => {
+      if (activeTypeFilter === 'ALL') return false;
+      return d.entity_type !== activeTypeFilter && d.entity_type !== 'EMAIL_TARGET';
+    };
+
     // Draw Links (Edges)
     const link = g
       .append('g')
@@ -150,6 +186,15 @@ export default function NetworkGraph({
       })
       .attr('marker-end', 'url(#arrow-confirmed)')
       .attr('cursor', 'pointer')
+      .style('opacity', (d) => {
+        if (activeTypeFilter === 'ALL') return 1;
+        const sourceNode = typeof d.source === 'object' ? d.source : nodeMap.get(d.source as string);
+        const targetNode = typeof d.target === 'object' ? d.target : nodeMap.get(d.target as string);
+        if (!sourceNode || !targetNode) return 1;
+        const dimmed = isNodeDimmed(sourceNode) || isNodeDimmed(targetNode);
+        return dimmed ? 0.08 : 1;
+      })
+      .style('transition', 'opacity 0.25s ease')
       .on('click', (event, d) => {
         event.stopPropagation();
         onSelectRelationship(d.originalRelationship);
@@ -164,6 +209,9 @@ export default function NetworkGraph({
       .enter()
       .append('g')
       .attr('cursor', 'pointer')
+      .style('opacity', (d) => (isNodeDimmed(d) ? 0.15 : 1))
+      .style('pointer-events', (d) => (isNodeDimmed(d) ? 'none' : 'all'))
+      .style('transition', 'opacity 0.25s ease')
       .call(
         d3
           .drag<SVGGElement, D3Node>()
@@ -258,7 +306,15 @@ export default function NetworkGraph({
     return () => {
       simulation.stop();
     };
-  }, [entities, relationships, selectedEntityId, isPaused, onSelectEntity, onSelectRelationship]);
+  }, [
+    entities,
+    relationships,
+    selectedEntityId,
+    isPaused,
+    activeTypeFilter,
+    onSelectEntity,
+    onSelectRelationship,
+  ]);
 
   const handleZoomIn = () => {
     if (svgRef.current && zoomBehaviorRef.current) {
@@ -295,7 +351,11 @@ export default function NetworkGraph({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full min-h-[500px] relative bg-[#FBFBFA] border border-[#E5E4DE] shadow-subtle overflow-hidden select-none"
+      className={`w-full select-none relative overflow-hidden transition-all ${
+        isFullscreen
+          ? 'fixed inset-0 z-50 bg-[#FBFBFA] h-screen w-screen p-4'
+          : 'h-full min-h-[550px] bg-[#FBFBFA] border border-[#E5E4DE] shadow-subtle'
+      }`}
     >
       {/* Background Coordinate Grid */}
       <div className="absolute inset-0 hairline-grid opacity-50 pointer-events-none" />
@@ -303,8 +363,36 @@ export default function NetworkGraph({
       {/* SVG Canvas */}
       <svg ref={svgRef} className="w-full h-full relative z-10 cursor-grab active:cursor-grabbing" />
 
+      {/* Top-Left Category Filter Overlay */}
+      <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-1.5 max-w-[calc(100%-180px)]">
+        <span className="text-[10px] font-mono text-[#64635E] uppercase tracking-wider mr-1 hidden sm:inline-flex items-center gap-1">
+          <Filter className="w-3 h-3" />
+          <span>FILTER:</span>
+        </span>
+        {availableTypes.map((type) => (
+          <button
+            key={type}
+            onClick={() => setActiveTypeFilter(type)}
+            className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider transition-all shadow-subtle ${
+              activeTypeFilter === type
+                ? 'bg-[#111110] text-[#C8FF00] font-bold border border-[#111110]'
+                : 'bg-white/90 backdrop-blur-sm border border-[#E5E4DE] text-[#64635E] hover:text-[#111110] hover:border-[#111110]'
+            }`}
+          >
+            {type}
+          </button>
+        ))}
+      </div>
+
       {/* Floating Control Toolbar */}
       <div className="absolute top-4 right-4 z-20 flex items-center bg-white border border-[#E5E4DE] shadow-subtle text-xs font-mono">
+        <button
+          onClick={() => setIsFullscreen(!isFullscreen)}
+          className="p-2 text-[#111110] hover:bg-[#F4F3EF] border-r border-[#E5E4DE]"
+          title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Expand Canvas Fullscreen'}
+        >
+          {isFullscreen ? <Minimize2 className="w-4 h-4 text-[#C8FF00] bg-[#111110] p-0.5 rounded-none" /> : <Maximize2 className="w-4 h-4" />}
+        </button>
         <button
           onClick={handleZoomIn}
           className="p-2 text-[#111110] hover:bg-[#F4F3EF] border-r border-[#E5E4DE]"
