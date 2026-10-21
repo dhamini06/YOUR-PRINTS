@@ -46,8 +46,11 @@ flowchart TD
         Stage2 --> DNS[DNS / MX / SPF / TXT]
         Stage2 --> RDAP[ICANN Domain RDAP]
         Stage2 --> Gravatar[Gravatar Profile API]
+        Stage2 --> PGP[OpenPGP Verifying Keyserver]
         Stage3 --> GitHub[GitHub Public API]
+        Stage3 --> GitLab[GitLab Public API]
         Stage3 --> Keybase[Keybase Identity Proofs]
+        Stage4 --> Exposure[XposedOrNot / HIBP]
     end
 
     subgraph Persistence & Retention
@@ -118,7 +121,9 @@ YOUR-PRINTS/
 │   │   │   ├── rdap_provider.py       # ICANN RDAP registrar metadata
 │   │   │   ├── gravatar_provider.py   # Gravatar avatar & profile lookup
 │   │   │   ├── github_provider.py     # GitHub public account inspector
+│   │   │   ├── gitlab_provider.py     # GitLab public account inspector
 │   │   │   ├── keybase_provider.py    # Keybase public identity proofs
+│   │   │   ├── pgp_provider.py        # OpenPGP verifying keyserver inspector
 │   │   │   ├── exposure_provider.py   # Public breach & exposure catalog (XposedOrNot & HIBP)
 │   │   │   └── registry.py            # Unified provider registry
 │   │   └── security/
@@ -128,7 +133,7 @@ YOUR-PRINTS/
 │   │       └── purge_task.py          # 48-hour retention auto-purge scheduler
 │   ├── migrations/                    # Alembic schema versions & async migration runner
 │   ├── alembic.ini                    # Alembic environment configuration
-│   └── tests/                         # Pytest test suite (70 unit & E2E tests)
+│   └── tests/                         # Pytest test suite (78 unit & E2E tests)
 ├── frontend/
 │   └── src/
 │       ├── app/
@@ -176,7 +181,7 @@ pip install -r requirements.txt
 # Run database migrations
 python -m alembic upgrade head
 
-# Run all 70 test suites
+# Run all 78 test suites
 pytest
 ```
 

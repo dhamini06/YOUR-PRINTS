@@ -8,6 +8,8 @@ from app.providers.gravatar_provider import GravatarProvider
 from app.providers.github_provider import GitHubProvider
 from app.providers.keybase_provider import KeybaseProvider
 from app.providers.exposure_provider import ExposureProvider
+from app.providers.gitlab_provider import GitLabProvider
+from app.providers.pgp_provider import OpenPGPProvider
 
 
 class ProviderRegistry:
@@ -27,6 +29,8 @@ class ProviderRegistry:
         self.register(GitHubProvider())
         self.register(KeybaseProvider())
         self.register(ExposureProvider())
+        self.register(GitLabProvider())
+        self.register(OpenPGPProvider())
 
 
     def register(self, provider: BaseProvider):

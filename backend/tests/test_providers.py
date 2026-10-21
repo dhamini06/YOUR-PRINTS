@@ -10,6 +10,8 @@ from app.providers.github_provider import GitHubProvider
 from app.providers.rdap_provider import RDAPProvider
 from app.providers.keybase_provider import KeybaseProvider
 from app.providers.exposure_provider import ExposureProvider
+from app.providers.gitlab_provider import GitLabProvider
+from app.providers.pgp_provider import OpenPGPProvider
 from app.providers.registry import ProviderRegistry
 
 
@@ -299,6 +301,12 @@ async def test_provider_registry_discovery():
     assert "provider-dns" in provider_ids
     assert "provider-gravatar" in provider_ids
     assert "provider-exposure" in provider_ids
+    assert "provider-openpgp" in provider_ids
+
+    username_providers = [p.provider_id for p in registry.get_providers_for_pivot("username")]
+    assert "provider-github" in username_providers
+    assert "provider-gitlab" in username_providers
+    assert "provider-keybase" in username_providers
 
     exposure_providers = registry.get_providers_for_pivot("exposure")
     assert len(exposure_providers) >= 1
@@ -356,4 +364,122 @@ async def test_exposure_provider_rate_limited():
     result = await provider.query("exposure", "throttled@example.com")
     assert result.status == ProviderStatus.RATE_LIMITED
     assert result.status_code == 429
+
+
+# ==============================================================================
+# 8. GitLab Provider Tests
+# ==============================================================================
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_gitlab_provider_success():
+    provider = GitLabProvider()
+    mock_payload = [
+        {
+            "id": 12345,
+            "username": "alexsmith",
+            "name": "Alex Smith",
+            "web_url": "https://gitlab.com/alexsmith",
+            "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/12345/avatar.png",
+            "bio": "Open source developer",
+            "website_url": "https://alexsmith.dev",
+            "location": "Berlin",
+            "created_at": "2020-01-15T10:00:00Z",
+        }
+    ]
+    respx.get("https://gitlab.com/api/v4/users?username=alexsmith").respond(
+        status_code=200, json=mock_payload
+    )
+
+    result = await provider.query("username", "alexsmith")
+    assert result.status == ProviderStatus.SUCCESS
+    assert result.status_code == 200
+    assert len(result.extracted_signals) == 1
+    sig = result.extracted_signals[0]
+    assert sig["signal_type"] == "PUBLIC_ACCOUNT"
+    assert sig["platform"] == "GitLab"
+    assert sig["username"] == "alexsmith"
+    assert sig["display_name"] == "Alex Smith"
+    assert sig["profile_url"] == "https://gitlab.com/alexsmith"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_gitlab_provider_not_found():
+    provider = GitLabProvider()
+    respx.get("https://gitlab.com/api/v4/users?username=nonexistent_user_99").respond(
+        status_code=200, json=[]
+    )
+
+    result = await provider.query("username", "nonexistent_user_99")
+    assert result.status == ProviderStatus.NO_RESULTS
+    assert len(result.extracted_signals) == 0
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_gitlab_provider_rate_limited():
+    provider = GitLabProvider()
+    respx.get("https://gitlab.com/api/v4/users?username=throttled").respond(
+        status_code=429
+    )
+
+    result = await provider.query("username", "throttled")
+    assert result.status == ProviderStatus.RATE_LIMITED
+    assert result.status_code == 429
+
+
+# ==============================================================================
+# 9. OpenPGP Provider Tests
+# ==============================================================================
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_openpgp_provider_success():
+    provider = OpenPGPProvider()
+    mock_armored_key = (
+        "-----BEGIN PGP PUBLIC KEY BLOCK-----\n"
+        "mQGNBF+0000BDAD...\n"
+        "-----END PGP PUBLIC KEY BLOCK-----"
+    )
+    respx.get("https://keys.openpgp.org/vks/v1/by-email/verified@example.com").respond(
+        status_code=200, text=mock_armored_key
+    )
+
+    result = await provider.query("email", "verified@example.com")
+    assert result.status == ProviderStatus.SUCCESS
+    assert result.status_code == 200
+    assert len(result.extracted_signals) == 1
+    sig = result.extracted_signals[0]
+    assert sig["signal_type"] == "CRYPTOGRAPHIC_PROOF"
+    assert sig["proof_type"] == "openpgp"
+    assert sig["nametag"] == "verified@example.com"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_openpgp_provider_not_found():
+    provider = OpenPGPProvider()
+    respx.get("https://keys.openpgp.org/vks/v1/by-email/unregistered@example.com").respond(
+        status_code=404
+    )
+
+    result = await provider.query("email", "unregistered@example.com")
+    assert result.status == ProviderStatus.NO_RESULTS
+    assert result.status_code == 404
+    assert len(result.extracted_signals) == 0
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_openpgp_provider_rate_limited():
+    provider = OpenPGPProvider()
+    respx.get("https://keys.openpgp.org/vks/v1/by-email/rate_limited@example.com").respond(
+        status_code=429
+    )
+
+    result = await provider.query("email", "rate_limited@example.com")
+    assert result.status == ProviderStatus.RATE_LIMITED
+    assert result.status_code == 429
+
 

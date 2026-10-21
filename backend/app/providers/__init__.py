@@ -7,6 +7,8 @@ from app.providers.gravatar_provider import GravatarProvider
 from app.providers.github_provider import GitHubProvider
 from app.providers.keybase_provider import KeybaseProvider
 from app.providers.exposure_provider import ExposureProvider
+from app.providers.gitlab_provider import GitLabProvider
+from app.providers.pgp_provider import OpenPGPProvider
 
 __all__ = [
     "BaseProvider",
@@ -19,5 +21,7 @@ __all__ = [
     "GitHubProvider",
     "KeybaseProvider",
     "ExposureProvider",
+    "GitLabProvider",
+    "OpenPGPProvider",
 ]
 
