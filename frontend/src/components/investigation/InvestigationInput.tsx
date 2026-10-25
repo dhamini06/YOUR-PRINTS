@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, Shield, CheckCircle2, EyeOff, Search, Loader2, Clock } from 'lucide-react';
 import { createInvestigation } from '@/lib/api';
 import { Investigation } from '@/lib/types';
@@ -17,6 +18,7 @@ interface RecentItem {
 }
 
 export default function InvestigationInput({ onInvestigatePreview }: InvestigationInputProps) {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,6 +90,9 @@ export default function InvestigationInput({ onInvestigatePreview }: Investigati
       if (onInvestigatePreview) {
         onInvestigatePreview(cleanEmail);
       }
+
+      // Smoothly navigate directly to the progressive investigation runner / dossier
+      router.push(`/investigate/${result.id}`);
     } catch (err: any) {
       setError(err.message || 'Failed to initialize investigation.');
     } finally {

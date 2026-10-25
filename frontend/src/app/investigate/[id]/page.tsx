@@ -61,27 +61,35 @@ export default function InvestigationDetailPage() {
     if (!investigationId) return;
 
     let isMounted = true;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function loadData() {
       try {
-        setLoading(true);
         const data = await getInvestigation(investigationId);
-        if (isMounted) {
-          setInvestigation(data);
-          setError(null);
+        if (!isMounted) return;
+
+        setInvestigation(data);
+        setError(null);
+        setLoading(false);
+
+        // Auto-poll if investigation is actively progressing through stages
+        const terminalStatuses = ['COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED'];
+        if (!terminalStatuses.includes(data.status)) {
+          pollTimer = setTimeout(loadData, 1500);
         }
       } catch (err: any) {
         if (isMounted) {
           setError(err.message || 'Failed to load investigation.');
+          setLoading(false);
         }
-      } finally {
-        if (isMounted) setLoading(false);
       }
     }
 
     loadData();
+
     return () => {
       isMounted = false;
+      if (pollTimer) clearTimeout(pollTimer);
     };
   }, [investigationId]);
 
@@ -298,6 +306,181 @@ export default function InvestigationDetailPage() {
         >
           Return to Home
         </Link>
+      </div>
+    );
+  }
+
+  // Active progressive execution view while investigation pipeline is running
+  if (!['COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED'].includes(investigation.status)) {
+    const stages = [
+      {
+        num: '01',
+        title: 'TARGET VALIDATION',
+        desc: 'Syntax, DNS records, MX mail server resolution',
+        isActive: investigation.current_stage.startsWith('01'),
+        isPassed: !investigation.current_stage.startsWith('01'),
+      },
+      {
+        num: '02',
+        title: 'PUBLIC SIGNAL DISCOVERY',
+        desc: 'Gravatar, ICANN RDAP, OpenPGP verifying keyserver',
+        isActive: investigation.current_stage.startsWith('02'),
+        isPassed:
+          investigation.current_stage.startsWith('03') ||
+          investigation.current_stage.startsWith('04') ||
+          investigation.current_stage.startsWith('05'),
+      },
+      {
+        num: '03',
+        title: 'IDENTITY CORRELATION',
+        desc: 'GitHub, GitLab, Keybase secondary username pivoting',
+        isActive: investigation.current_stage.startsWith('03'),
+        isPassed:
+          investigation.current_stage.startsWith('04') ||
+          investigation.current_stage.startsWith('05'),
+      },
+      {
+        num: '04',
+        title: 'EXPOSURE ANALYSIS',
+        desc: 'Public breach catalogs with masked attributes',
+        isActive: investigation.current_stage.startsWith('04'),
+        isPassed: investigation.current_stage.startsWith('05'),
+      },
+      {
+        num: '05',
+        title: 'DIGITAL FOOTPRINT GRAPH',
+        desc: 'Three-tier confidence scoring and evidence linking',
+        isActive: investigation.current_stage.startsWith('05'),
+        isPassed: false,
+      },
+    ];
+
+    return (
+      <div className="flex-1 hairline-grid flex flex-col justify-center items-center p-6 md:p-12 bg-[#FBFBFA]">
+        <div className="max-w-4xl w-full bg-white border border-[#E5E4DE] shadow-subtle p-6 md:p-8 space-y-8 animate-fadeIn">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#E5E4DE] pb-6 gap-4">
+            <div className="space-y-1">
+              <div className="text-[10px] font-mono text-[#64635E] uppercase tracking-widest flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#C8FF00] border border-[#111110]/30 animate-pulse" />
+                <span>ACTIVE INVESTIGATION PIPELINE // {investigation.id}</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-serif text-[#111110]">
+                {investigation.target_value}
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-[#111110] text-[#C8FF00] font-mono text-xs uppercase tracking-wider font-semibold">
+                {investigation.status}
+              </span>
+            </div>
+          </div>
+
+          {/* 5-Stage Progressive Cards */}
+          <div className="space-y-3">
+            <div className="text-xs font-mono text-[#64635E] uppercase tracking-wider flex items-center justify-between">
+              <span>Investigation Lifecycle Execution</span>
+              <span className="text-[10px] text-[#111110] font-semibold flex items-center gap-1.5">
+                <Loader2 className="w-3 h-3 animate-spin text-[#111110]" />
+                <span>POLLING PROVIDER TELEMETRY (1.5S)</span>
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              {stages.map((stage) => {
+                const isCurrent = stage.isActive;
+                const isDone = stage.isPassed;
+                return (
+                  <div
+                    key={stage.num}
+                    className={`p-4 border flex flex-col justify-between transition-all ${
+                      isCurrent
+                        ? 'bg-[#111110] text-white border-[#111110] shadow-md scale-[1.02]'
+                        : isDone
+                        ? 'bg-[#F4F3EF] text-[#111110] border-[#E5E4DE]'
+                        : 'bg-[#FBFBFA] text-[#9E9D97] border-[#E5E4DE]/60'
+                    }`}
+                  >
+                    <div>
+                      <div
+                        className={`font-mono text-[10px] font-bold flex items-center justify-between ${
+                          isCurrent
+                            ? 'text-[#C8FF00]'
+                            : isDone
+                            ? 'text-[#111110]'
+                            : 'text-[#9E9D97]'
+                        }`}
+                      >
+                        <span>STAGE {stage.num}</span>
+                        {isDone && <CheckCircle2 className="w-3 h-3 text-[#111110]" />}
+                        {isCurrent && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#C8FF00] animate-ping" />
+                        )}
+                      </div>
+                      <div
+                        className={`font-mono text-xs font-bold mt-2 ${
+                          isCurrent ? 'text-white' : isDone ? 'text-[#111110]' : 'text-[#64635E]'
+                        }`}
+                      >
+                        {stage.title}
+                      </div>
+                    </div>
+                    <div
+                      className={`font-sans text-[11px] mt-4 leading-relaxed ${
+                        isCurrent ? 'text-[#D6D5CD]' : isDone ? 'text-[#64635E]' : 'text-[#9E9D97]'
+                      }`}
+                    >
+                      {stage.desc}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Provider Telemetry Matrix (if any queried so far) */}
+          {investigation.provider_states && Object.keys(investigation.provider_states).length > 0 && (
+            <div className="p-4 bg-[#FBFBFA] border border-[#E5E4DE] space-y-2">
+              <div className="text-[10px] font-mono text-[#64635E] uppercase tracking-wider">
+                ACTIVE PROVIDER TELEMETRY
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(investigation.provider_states).map(([prov, st]) => (
+                  <div
+                    key={prov}
+                    className="px-2 py-1 bg-white border border-[#E5E4DE] text-[10px] font-mono flex items-center gap-1.5"
+                  >
+                    <span className="text-[#64635E]">{prov}:</span>
+                    <span
+                      className={`font-bold ${
+                        st === 'SUCCESS'
+                          ? 'text-[#111110]'
+                          : st === 'NO_RESULTS'
+                          ? 'text-[#9E9D97]'
+                          : 'text-[#C5221F]'
+                      }`}
+                    >
+                      {st}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ephemeral Guarantee Footer */}
+          <div className="p-4 bg-[#F4F3EF] border border-[#E5E4DE] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono">
+            <div className="flex items-center space-x-2 text-[#64635E]">
+              <Shield className="w-4 h-4 text-[#111110]" />
+              <span>Evidence Before Inference. Ephemeral 48-Hour Retention Window.</span>
+            </div>
+            <Link
+              href="/"
+              className="text-[#64635E] hover:text-[#111110] underline text-[11px]"
+            >
+              Cancel & Return Home
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
