@@ -283,6 +283,119 @@ export default function InvestigationDetailPage() {
     });
   }, [investigation, filteredEntities, matrixSearch]);
 
+  // Memoized Chronological Timeline Events
+  const timelineEvents = useMemo(() => {
+    if (!investigation) return [];
+    const events: Array<{
+      id: string;
+      category: 'INITIATION' | 'REGISTRATION' | 'EXPOSURE' | 'DOMAIN' | 'COMPLETION';
+      title: string;
+      dateDisplay: string;
+      timestamp: number;
+      description: string;
+      badge: string;
+      badgeColor: string;
+      entity?: Entity;
+    }> = [];
+
+    // 1. Investigation Initiation
+    const initDate = new Date(investigation.created_at);
+    events.push({
+      id: 'init-0',
+      category: 'INITIATION',
+      title: 'Investigation Initiated',
+      dateDisplay: initDate.toUTCString(),
+      timestamp: initDate.getTime(),
+      description: `Target email '${investigation.target_value}' submitted for public digital footprint mapping.`,
+      badge: 'PIPELINE START',
+      badgeColor: 'bg-[#C8FF00] text-[#111110] border border-[#111110]',
+    });
+
+    // 2. Discoveries with dates
+    for (const ent of investigation.entities) {
+      // Account registrations (GitHub, GitLab, Hacker News, Dev.to, Keybase)
+      if (ent.attributes?.account_created_at) {
+        const rawDate = ent.attributes.account_created_at;
+        let dDisplay = String(rawDate);
+        let ts = 0;
+        if (/^\d{9,12}$/.test(String(rawDate).trim())) {
+          const epochMs = parseInt(String(rawDate), 10) * 1000;
+          const d = new Date(epochMs);
+          if (!isNaN(d.getTime())) {
+            dDisplay = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            ts = epochMs;
+          }
+        } else {
+          const d = new Date(rawDate);
+          if (!isNaN(d.getTime())) {
+            dDisplay = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            ts = d.getTime();
+          }
+        }
+        const platform = ent.attributes?.platform || 'Public';
+        events.push({
+          id: ent.id,
+          category: 'REGISTRATION',
+          title: `${platform} Public Profile Discovered`,
+          dateDisplay: dDisplay,
+          timestamp: ts,
+          description: `${ent.display_label}${ent.attributes?.bio ? ` — "${ent.attributes.bio.slice(0, 80)}..."` : ''}`,
+          badge: `${platform.toUpperCase()}`,
+          badgeColor: 'bg-[#111110] text-[#C8FF00]',
+          entity: ent,
+        });
+      }
+
+      // Exposure / Breach disclosure events
+      if (ent.entity_type === 'EXPOSURE_EVENT') {
+        const bDate = ent.attributes?.breach_date || ent.attributes?.year || 'Historical Disclosure';
+        let ts = 0;
+        const d = new Date(bDate);
+        if (!isNaN(d.getTime())) {
+          ts = d.getTime();
+        }
+        const classes = Array.isArray(ent.attributes?.compromised_data_classes)
+          ? ent.attributes.compromised_data_classes.join(', ')
+          : 'Identity signals';
+        events.push({
+          id: ent.id,
+          category: 'EXPOSURE',
+          title: `Public Breach Disclosure: ${ent.attributes?.breach_title || ent.display_label}`,
+          dateDisplay: String(bDate),
+          timestamp: ts,
+          description: `Disclosed attributes: ${classes}. Appeared in public disclosure catalog for ${ent.attributes?.domain || 'external service'}.`,
+          badge: 'BREACH CATALOG',
+          badgeColor: 'bg-[#FFF1F2] text-[#B91C1C] border border-[#FECDD3]',
+          entity: ent,
+        });
+      }
+    }
+
+    // 3. Pipeline Completion
+    if (investigation.completed_at) {
+      const compDate = new Date(investigation.completed_at);
+      events.push({
+        id: 'comp-end',
+        category: 'COMPLETION',
+        title: 'Intelligence Graph Synthesis Completed',
+        dateDisplay: compDate.toUTCString(),
+        timestamp: compDate.getTime() + 1,
+        description: `All ${Object.keys(investigation.provider_states || {}).length} OSINT providers resolved and correlated into ${investigation.entities.length} entities and ${investigation.relationships.length} evidentiary links.`,
+        badge: 'COMPLETED',
+        badgeColor: 'bg-[#111110] text-white',
+      });
+    }
+
+    // Sort chronologically
+    return events.sort((a, b) => {
+      if (a.category === 'INITIATION') return -1;
+      if (b.category === 'INITIATION') return 1;
+      if (a.category === 'COMPLETION') return 1;
+      if (b.category === 'COMPLETION') return -1;
+      return a.timestamp - b.timestamp;
+    });
+  }, [investigation]);
+
   if (loading) {
     return (
       <div className="flex-1 hairline-grid flex flex-col items-center justify-center p-12 space-y-4">
@@ -639,7 +752,7 @@ export default function InvestigationDetailPage() {
             }`}
           >
             <Clock className="w-4 h-4" />
-            <span>03 Timeline View</span>
+            <span>03 Timeline ({timelineEvents.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('audit')}
@@ -842,50 +955,73 @@ export default function InvestigationDetailPage() {
         {/* TAB 3: TIMELINE VIEW */}
         {activeTab === 'timeline' && (
           <div className="max-w-3xl mx-auto space-y-6 font-mono text-xs">
-            <div className="text-xs font-mono text-[#64635E] uppercase tracking-wider">
-              CHRONOLOGICAL RECONSTRUCTION OF DISCOVERED EVENTS
+            <div className="flex items-center justify-between text-xs font-mono text-[#64635E] uppercase tracking-wider pb-2 border-b border-[#E5E4DE]">
+              <span>CHRONOLOGICAL RECONSTRUCTION OF DISCOVERED EVENTS</span>
+              <span>{timelineEvents.length} KEY EVENTS</span>
             </div>
-            <div className="relative border-l-2 border-[#E5E4DE] ml-4 space-y-8 py-2">
-              <div className="relative pl-6">
-                <div className="absolute -left-[9px] top-1 w-4 h-4 bg-[#C8FF00] border-2 border-[#111110] rounded-full"></div>
-                <div className="text-[10px] text-[#64635E]">INVESTIGATION INITIATED</div>
-                <div className="font-bold text-[#111110] text-sm mt-0.5">
-                  {new Date(investigation.created_at).toUTCString()}
-                </div>
-                <p className="font-sans text-xs text-[#64635E] mt-1">
-                  Target email &lsquo;{investigation.target_value}&rsquo; submitted for public digital footprint mapping.
-                </p>
-              </div>
 
-              {entities
-                .filter((e) => e.attributes?.account_created_at || e.attributes?.event_date)
-                .map((e, idx) => (
-                  <div key={idx} className="relative pl-6">
-                    <div className="absolute -left-[7px] top-1.5 w-3 h-3 bg-[#111110] rounded-full"></div>
-                    <div className="text-[10px] text-[#64635E]">
-                      {e.attributes?.action?.toUpperCase() || 'ACCOUNT REGISTERED'}
+            <div className="relative border-l-2 border-[#E5E4DE] ml-4 space-y-6 py-2">
+              {timelineEvents.map((evt) => {
+                const isClickable = !!evt.entity;
+                return (
+                  <div key={evt.id} className="relative pl-7 group">
+                    {/* Timeline Node Dot */}
+                    <div
+                      className={`absolute -left-[9px] top-1.5 w-4 h-4 rounded-full border-2 transition-transform duration-200 ${
+                        evt.category === 'INITIATION'
+                          ? 'bg-[#C8FF00] border-[#111110]'
+                          : evt.category === 'EXPOSURE'
+                          ? 'bg-[#B91C1C] border-[#FFF1F2]'
+                          : evt.category === 'COMPLETION'
+                          ? 'bg-[#111110] border-[#C8FF00]'
+                          : 'bg-[#111110] border-white group-hover:scale-125'
+                      }`}
+                    />
+
+                    {/* Timeline Event Card */}
+                    <div
+                      onClick={() => {
+                        if (evt.entity) {
+                          handleSelectEntity(evt.entity);
+                        }
+                      }}
+                      className={`bg-white border p-4 transition-all duration-150 ${
+                        isClickable
+                          ? 'border-[#E5E4DE] hover:border-[#111110] hover:shadow-subtle cursor-pointer'
+                          : 'border-[#E5E4DE]'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${evt.badgeColor}`}>
+                          {evt.badge}
+                        </span>
+                        <span className="text-[11px] font-mono text-[#64635E] font-medium">
+                          {evt.dateDisplay}
+                        </span>
+                      </div>
+
+                      <div className="font-serif font-bold text-sm text-[#111110] mb-1">
+                        {evt.title}
+                      </div>
+
+                      <p className="font-sans text-xs text-[#64635E] leading-relaxed">
+                        {evt.description}
+                      </p>
+
+                      {isClickable && (
+                        <div className="mt-3 pt-2 border-t border-[#E5E4DE] flex items-center justify-between text-[11px] text-[#111110] group-hover:text-black">
+                          <span className="text-[10px] text-[#64635E] uppercase tracking-wider">
+                            Inspect Evidentiary Provenance
+                          </span>
+                          <span className="flex items-center gap-1 font-semibold text-xs text-[#111110] underline">
+                            View Chain-of-Custody &rarr;
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="font-bold text-[#111110] text-sm mt-0.5">
-                      {e.attributes?.account_created_at || e.attributes?.event_date}
-                    </div>
-                    <p className="font-sans text-xs text-[#64635E] mt-1">
-                      {e.display_label}
-                    </p>
                   </div>
-                ))}
-
-              <div className="relative pl-6">
-                <div className="absolute -left-[7px] top-1.5 w-3 h-3 bg-[#111110] rounded-full"></div>
-                <div className="text-[10px] text-[#64635E]">GRAPH SYNTHESIS COMPLETED</div>
-                <div className="font-bold text-[#111110] text-sm mt-0.5">
-                  {investigation.completed_at
-                    ? new Date(investigation.completed_at).toUTCString()
-                    : 'Active'}
-                </div>
-                <p className="font-sans text-xs text-[#64635E] mt-1">
-                  All provider queries resolved and correlated with explicit evidentiary provenance.
-                </p>
-              </div>
+                );
+              })}
             </div>
           </div>
         )}
