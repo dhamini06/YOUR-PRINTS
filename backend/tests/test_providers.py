@@ -12,6 +12,8 @@ from app.providers.keybase_provider import KeybaseProvider
 from app.providers.exposure_provider import ExposureProvider
 from app.providers.gitlab_provider import GitLabProvider
 from app.providers.pgp_provider import OpenPGPProvider
+from app.providers.hackernews_provider import HackerNewsProvider
+from app.providers.devto_provider import DevtoProvider
 from app.providers.registry import ProviderRegistry
 
 
@@ -307,6 +309,8 @@ async def test_provider_registry_discovery():
     assert "provider-github" in username_providers
     assert "provider-gitlab" in username_providers
     assert "provider-keybase" in username_providers
+    assert "provider-hackernews" in username_providers
+    assert "provider-devto" in username_providers
 
     exposure_providers = registry.get_providers_for_pivot("exposure")
     assert len(exposure_providers) >= 1
@@ -481,5 +485,125 @@ async def test_openpgp_provider_rate_limited():
     result = await provider.query("email", "rate_limited@example.com")
     assert result.status == ProviderStatus.RATE_LIMITED
     assert result.status_code == 429
+
+
+# ==============================================================================
+# 10. Hacker News Provider Tests
+# ==============================================================================
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_hackernews_provider_success():
+    provider = HackerNewsProvider()
+    mock_payload = {
+        "id": "torvalds",
+        "created": 1171825192,
+        "karma": 4200,
+        "about": "Creator of Linux and Git",
+    }
+    respx.get("https://hacker-news.firebaseio.com/v0/user/torvalds.json").respond(
+        status_code=200, json=mock_payload
+    )
+
+    result = await provider.query("username", "torvalds")
+    assert result.status == ProviderStatus.SUCCESS
+    assert result.status_code == 200
+    assert len(result.extracted_signals) == 1
+    sig = result.extracted_signals[0]
+    assert sig["signal_type"] == "PUBLIC_ACCOUNT"
+    assert sig["platform"] == "Hacker News"
+    assert sig["username"] == "torvalds"
+    assert sig["karma"] == 4200
+    assert "https://news.ycombinator.com/user?id=torvalds" in sig["profile_url"]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_hackernews_provider_null_not_found():
+    provider = HackerNewsProvider()
+    respx.get("https://hacker-news.firebaseio.com/v0/user/ghost_user_404.json").respond(
+        status_code=200, json=None
+    )
+
+    result = await provider.query("username", "ghost_user_404")
+    assert result.status == ProviderStatus.NO_RESULTS
+    assert len(result.extracted_signals) == 0
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_hackernews_provider_rate_limited():
+    provider = HackerNewsProvider()
+    respx.get("https://hacker-news.firebaseio.com/v0/user/throttled.json").respond(
+        status_code=429
+    )
+
+    result = await provider.query("username", "throttled")
+    assert result.status == ProviderStatus.RATE_LIMITED
+    assert result.status_code == 429
+
+
+# ==============================================================================
+# 11. Dev.to Provider Tests
+# ==============================================================================
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_devto_provider_success():
+    provider = DevtoProvider()
+    mock_payload = {
+        "type_of": "user",
+        "id": 8812,
+        "username": "codeninja",
+        "name": "Code Ninja",
+        "summary": "Fullstack web developer and OSS enthusiast",
+        "website_url": "https://codeninja.io",
+        "profile_image": "https://media.dev.to/avatar.png",
+        "joined_at": "Feb 10, 2019",
+        "location": "San Francisco",
+    }
+    respx.get("https://dev.to/api/users/by_username?url=codeninja").respond(
+        status_code=200, json=mock_payload
+    )
+
+    result = await provider.query("username", "codeninja")
+    assert result.status == ProviderStatus.SUCCESS
+    assert result.status_code == 200
+    assert len(result.extracted_signals) == 1
+    sig = result.extracted_signals[0]
+    assert sig["signal_type"] == "PUBLIC_ACCOUNT"
+    assert sig["platform"] == "Dev.to"
+    assert sig["username"] == "codeninja"
+    assert sig["display_name"] == "Code Ninja"
+    assert sig["profile_url"] == "https://dev.to/codeninja"
+    assert sig["bio"] == "Fullstack web developer and OSS enthusiast"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_devto_provider_not_found():
+    provider = DevtoProvider()
+    respx.get("https://dev.to/api/users/by_username?url=nonexistent").respond(
+        status_code=404
+    )
+
+    result = await provider.query("username", "nonexistent")
+    assert result.status == ProviderStatus.NO_RESULTS
+    assert result.status_code == 404
+    assert len(result.extracted_signals) == 0
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_devto_provider_rate_limited():
+    provider = DevtoProvider()
+    respx.get("https://dev.to/api/users/by_username?url=throttled").respond(
+        status_code=429
+    )
+
+    result = await provider.query("username", "throttled")
+    assert result.status == ProviderStatus.RATE_LIMITED
+    assert result.status_code == 429
+
 
 

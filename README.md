@@ -49,6 +49,8 @@ flowchart TD
         Stage2 --> PGP[OpenPGP Verifying Keyserver]
         Stage3 --> GitHub[GitHub Public API]
         Stage3 --> GitLab[GitLab Public API]
+        Stage3 --> HN[Hacker News Identity API]
+        Stage3 --> Devto[Dev.to Developer Profile]
         Stage3 --> Keybase[Keybase Identity Proofs]
         Stage4 --> Exposure[XposedOrNot / HIBP]
     end

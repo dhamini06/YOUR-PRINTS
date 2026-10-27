@@ -10,6 +10,8 @@ from app.providers.keybase_provider import KeybaseProvider
 from app.providers.exposure_provider import ExposureProvider
 from app.providers.gitlab_provider import GitLabProvider
 from app.providers.pgp_provider import OpenPGPProvider
+from app.providers.hackernews_provider import HackerNewsProvider
+from app.providers.devto_provider import DevtoProvider
 
 
 class ProviderRegistry:
@@ -31,6 +33,8 @@ class ProviderRegistry:
         self.register(ExposureProvider())
         self.register(GitLabProvider())
         self.register(OpenPGPProvider())
+        self.register(HackerNewsProvider())
+        self.register(DevtoProvider())
 
 
     def register(self, provider: BaseProvider):
