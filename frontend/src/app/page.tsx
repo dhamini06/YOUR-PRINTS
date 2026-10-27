@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import IdentityCore from '@/components/3d/IdentityCore';
 import InvestigationInput from '@/components/investigation/InvestigationInput';
-import { ArrowUpRight, ShieldCheck, Database, GitFork, Lock, Network, FileCheck2, Cpu } from 'lucide-react';
+import { ArrowUpRight, ShieldCheck, Database, GitFork, Lock, Network, FileCheck2, Cpu, CheckCircle2, Server, Globe } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -96,7 +96,7 @@ export default function HomePage() {
               </div>
               <h3 className="font-serif text-xl text-[#111110]">Public Profile Correlation</h3>
               <p className="font-sans text-xs text-[#64635E] leading-relaxed">
-                Public avatars (Gravatar SHA-256), derived usernames, and authorized profile endpoints across public developer platforms.
+                Cryptographic avatars (Gravatar SHA-256), derived usernames, and authorized profile endpoints across GitHub, GitLab, Hacker News, Dev.to, and Keybase.
               </p>
               <div className="pt-2 font-mono text-[10px] text-[#111110] uppercase tracking-wider flex items-center gap-1.5">
                 <span className="w-1 h-1 bg-[#C8FF00]"></span>
@@ -112,7 +112,7 @@ export default function HomePage() {
               </div>
               <h3 className="font-serif text-xl text-[#111110]">Cryptographic Identity</h3>
               <p className="font-sans text-xs text-[#64635E] leading-relaxed">
-                Public Keybase identity proofs, PGP public keys, published domain ownership records, and verified author profiles.
+                Public Keybase identity proofs, OpenPGP keyserver verification, published domain ownership records, and verified author profiles.
               </p>
               <div className="pt-2 font-mono text-[10px] text-[#111110] uppercase tracking-wider flex items-center gap-1.5">
                 <span className="w-1 h-1 bg-[#C8FF00]"></span>
@@ -140,13 +140,78 @@ export default function HomePage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* SECTION 2: Core Philosophy: Evidence Before Inference */}
+      {/* SECTION 2: 10 First-Class Zero-Cost OSINT Collectors */}
+      {/* ========================================================================= */}
+      <section className="px-6 py-16 md:py-20 bg-[#FBFBFA] border-b border-[#E5E4DE]">
+        <div className="max-w-7xl mx-auto space-y-10">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[#E5E4DE] pb-6">
+            <div className="space-y-2">
+              <div className="font-mono text-xs uppercase tracking-widest text-[#64635E]">
+                02 // COLLECTOR MATRIX
+              </div>
+              <h2 className="text-3xl md:text-4xl font-serif text-[#111110]">
+                10 Integrated OSINT Adapters
+              </h2>
+            </div>
+            <p className="font-mono text-xs text-[#64635E] max-w-md">
+              Each provider runs in isolated, parallel coroutines with strict bounded timeouts and epistemological evidentiary logging.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {[
+              { id: 'DNS', name: 'DNS & MX Resolution', protocol: 'RFC 1035 / Async DNS', pivot: 'domain / email', badge: 'Definitive' },
+              { id: 'RDAP', name: 'ICANN Registry RDAP', protocol: 'RFC 7480 REST RDAP', pivot: 'domain', badge: 'Definitive' },
+              { id: 'GRAVATAR', name: 'Gravatar Avatar Index', protocol: 'SHA-256 Digest API', pivot: 'email', badge: 'Confirmed' },
+              { id: 'GITHUB', name: 'GitHub Public Profile', protocol: 'GitHub REST v3 API', pivot: 'username', badge: 'Reliable' },
+              { id: 'GITLAB', name: 'GitLab Profile Explorer', protocol: 'GitLab REST v4 API', pivot: 'username', badge: 'Reliable' },
+              { id: 'HACKERNEWS', name: 'Hacker News Public API', protocol: 'Firebase Realtime REST', pivot: 'username', badge: 'Reliable' },
+              { id: 'DEVTO', name: 'Dev.to Community API', protocol: 'Forem Official REST', pivot: 'username', badge: 'Reliable' },
+              { id: 'KEYBASE', name: 'Keybase Identity Proofs', protocol: 'Keybase Public API', pivot: 'username', badge: 'Definitive' },
+              { id: 'OPENPGP', name: 'OpenPGP Verifying VKS', protocol: 'keys.openpgp.org Hagrid', pivot: 'email', badge: 'Definitive' },
+              { id: 'EXPOSURE', name: 'XposedOrNot Directory', protocol: 'Public Breach Catalog', pivot: 'email', badge: 'Historical' },
+            ].map((adapter) => (
+              <div
+                key={adapter.id}
+                className="bg-white border border-[#E5E4DE] p-4 space-y-2.5 hover:border-[#111110] transition-colors shadow-subtle flex flex-col justify-between"
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] text-[#64635E] tracking-wider uppercase font-semibold">
+                      {adapter.id}
+                    </span>
+                    <span className="px-1.5 py-0.2 bg-[#F4F3EF] border border-[#E5E4DE] text-[9px] font-mono text-[#111110]">
+                      {adapter.badge}
+                    </span>
+                  </div>
+                  <h4 className="font-serif font-bold text-sm text-[#111110] leading-snug">
+                    {adapter.name}
+                  </h4>
+                  <p className="font-mono text-[10px] text-[#64635E] leading-normal">
+                    {adapter.protocol}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-[#E5E4DE] flex items-center justify-between font-mono text-[9px]">
+                  <span className="text-[#64635E] uppercase">Pivot: {adapter.pivot}</span>
+                  <span className="flex items-center gap-1 text-[#111110] font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#C8FF00] border border-[#111110]/40"></span>
+                    Live
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SECTION 3: Core Philosophy: Evidence Before Inference */}
       {/* ========================================================================= */}
       <section className="px-6 py-16 md:py-24 border-b border-[#E5E4DE] hairline-grid">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-5 space-y-6">
             <div className="font-mono text-xs uppercase tracking-widest text-[#64635E]">
-              02 // CORE PHILOSOPHY
+              03 // CORE PHILOSOPHY
             </div>
             <h2 className="text-3xl md:text-4xl font-serif text-[#111110] leading-tight">
               An Observation Is a Fact. <br />
@@ -214,13 +279,13 @@ export default function HomePage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* SECTION 3: Forensic Contrast Matrix */}
+      {/* SECTION 4: Forensic Contrast Matrix */}
       {/* ========================================================================= */}
       <section className="px-6 py-16 md:py-24 bg-white border-b border-[#E5E4DE]">
         <div className="max-w-7xl mx-auto space-y-10">
           <div className="space-y-2">
             <div className="font-mono text-xs uppercase tracking-widest text-[#64635E]">
-              03 // METHODOLOGICAL COMPARISON
+              04 // METHODOLOGICAL COMPARISON
             </div>
             <h2 className="text-3xl md:text-4xl font-serif text-[#111110]">
               Why YOUR-PRINTS Is Different
@@ -281,13 +346,13 @@ export default function HomePage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* SECTION 4: Ethical Safeguards & Right to Erasure */}
+      {/* SECTION 5: Ethical Safeguards & Right to Erasure */}
       {/* ========================================================================= */}
       <section className="px-6 py-16 md:py-24 border-b border-[#E5E4DE] hairline-grid">
         <div className="max-w-4xl mx-auto space-y-8 text-center flex flex-col items-center">
           <div className="inline-flex items-center space-x-2 font-mono text-xs uppercase tracking-widest text-[#64635E]">
             <Lock className="w-3.5 h-3.5 text-[#111110]" />
-            <span>RESPONSIBLE OSINT & PRIVACY GOVERNANCE</span>
+            <span>05 // RESPONSIBLE OSINT & PRIVACY GOVERNANCE</span>
           </div>
 
           <h2 className="text-3xl md:text-5xl font-serif text-[#111110] leading-tight">
